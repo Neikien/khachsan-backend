@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 import os
 import uvicorn
 
@@ -14,12 +15,11 @@ from app.controllers.service import router as service_router
 # Import router của chatbot
 from app.controllers.chatbot_controller import router as chatbot_router
 
-# THAY ĐỔI 1: Import engine, Base từ database
-from app.core.database import engine, Base
-# THAY ĐỔI 2: Import config để lấy DATABASE_URL
+# Import SYNC database components
+from app.core.database import engine, Base, get_db
 from app.core.config import config
 
-# Import models
+# Import models để SQLAlchemy nhận biết
 from app.models import user, area, hotel, room, customer, booking, service, review, activity_log
 
 # THÊM DEBUG LOG NGAY ĐẦU
@@ -62,11 +62,11 @@ app.include_router(service_router, prefix='/services', tags=['Services'])
 # Include router chatbot
 app.include_router(chatbot_router)
 
-# Tạo database tables khi start - FIXED FOR DEPLOYMENT
+# Tạo database tables khi start - SYNC VERSION
 @app.on_event("startup")
-async def startup_event():
+def startup_event():  # Bỏ async
     try:
-        # Sử dụng config.DATABASE_URL thay vì DATABASE_URL
+        # Sử dụng config.DATABASE_URL
         safe_url = config.DATABASE_URL
         if safe_url and "://" in safe_url:
             protocol, rest = safe_url.split("://", 1)
@@ -77,22 +77,21 @@ async def startup_event():
                     safe_url = f"{protocol}://{user}:****@{host_db}"
         print(f"🔗 Connecting to database: {safe_url}")
         
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        # SYNC create tables
+        Base.metadata.create_all(bind=engine)
         print("✅ Database tables created successfully")
         
     except Exception as e:
         print(f"❌ Database connection error: {e}")
         print(f"Database URL from config: {config.DATABASE_URL}")
         print(f"Is PostgreSQL URL: {config.DATABASE_URL and 'postgresql' in config.DATABASE_URL}")
-        print(f"Full error trace:")
         import traceback
         traceback.print_exc()
         raise
 
 # Root endpoint
 @app.get('/')
-async def root():
+def root():  # Bỏ async
     return {
         "message": "Hotel Management API", 
         "version": "1.0.0",
@@ -100,12 +99,13 @@ async def root():
         "redoc": "/redoc"
     }
 
-# Health check with database connectivity test
+# Health check with database connectivity test - SYNC
 @app.get('/health')
-async def health_check():
+def health_check():  # Bỏ async
     try:
-        async with engine.connect() as conn:
-            await conn.execute("SELECT 1")
+        # Test database connection SYNC
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
         return {
             "status": "healthy", 
             "service": "hotel-management",
@@ -121,7 +121,7 @@ async def health_check():
 
 # Debug endpoint
 @app.get('/debug/database')
-async def debug_database():
+def debug_database():  # Bỏ async
     import re
     safe_url = config.DATABASE_URL
     if safe_url:
@@ -134,6 +134,15 @@ async def debug_database():
         "environment": "render" if os.getenv("RENDER") else "local",
         "port": os.getenv("PORT", "8000")
     }
+
+# Simple test endpoint
+@app.get('/test')
+def test_endpoint(db: Session = Depends(get_db)):
+    try:
+        db.execute("SELECT 1")
+        return {"message": "Database connection successful", "status": "ok"}
+    except Exception as e:
+        return {"message": "Database connection failed", "error": str(e)}, 500
 
 # Run with Render port (10000)
 if __name__ == '__main__':
