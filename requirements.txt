@@ -28,3 +28,7 @@ typing_extensions==4.13.2
 urllib3==2.4.0
 email-validator>=2.0.0
 argon2-cffi 
+# Thêm vào requirements.txt
+psycopg2-binary==2.9.9  # CHO POSTGRESQL SYNC
+pymysql==1.1.0          # CHO MYSQL SYNC
+
