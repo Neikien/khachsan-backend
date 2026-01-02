@@ -6,6 +6,7 @@ python-multipart==0.0.6
 # SQL Database
 sqlalchemy==2.0.23
 aiomysql==0.2.0
+asyncpg==0.29.0  # ← THÊM DÒNG NÀY CHO POSTGRESQL TRÊN RENDER
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0
