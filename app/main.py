@@ -14,8 +14,20 @@ from app.controllers.service import router as service_router
 # Import router của chatbot
 from app.controllers.chatbot_controller import router as chatbot_router
 
-from app.core.database import engine, Base, DATABASE_URL  # Import DATABASE_URL
+# THAY ĐỔI 1: Import engine, Base từ database
+from app.core.database import engine, Base
+# THAY ĐỔI 2: Import config để lấy DATABASE_URL
+from app.core.config import config
+
+# Import models
 from app.models import user, area, hotel, room, customer, booking, service, review, activity_log
+
+# THÊM DEBUG LOG NGAY ĐẦU
+print("=" * 50)
+print("🚀 STARTING APPLICATION ON RENDER")
+print("=" * 50)
+print(f"Environment DATABASE_URL exists: {'DATABASE_URL' in os.environ}")
+print(f"Config DATABASE_URL: {config.DATABASE_URL[:50] if config.DATABASE_URL else 'None'}...")
 
 app = FastAPI(
     title="Hotel Management API",
@@ -27,8 +39,8 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
-    "https://your-frontend.onrender.com",  # Thêm frontend URL sau
-    "*"  # Tạm thời cho development
+    "https://your-frontend.onrender.com",
+    "*"
 ]
 
 app.add_middleware(
@@ -54,10 +66,10 @@ app.include_router(chatbot_router)
 @app.on_event("startup")
 async def startup_event():
     try:
-        # Log database URL (ẩn password)
-        safe_url = DATABASE_URL
-        if "://" in DATABASE_URL:
-            protocol, rest = DATABASE_URL.split("://", 1)
+        # Sử dụng config.DATABASE_URL thay vì DATABASE_URL
+        safe_url = config.DATABASE_URL
+        if safe_url and "://" in safe_url:
+            protocol, rest = safe_url.split("://", 1)
             if "@" in rest:
                 user_pass, host_db = rest.split("@", 1)
                 if ":" in user_pass:
@@ -71,8 +83,11 @@ async def startup_event():
         
     except Exception as e:
         print(f"❌ Database connection error: {e}")
-        print(f"Database URL type: {type(DATABASE_URL)}")
-        print(f"Database URL preview: {str(DATABASE_URL)[:50]}...")
+        print(f"Database URL from config: {config.DATABASE_URL}")
+        print(f"Is PostgreSQL URL: {config.DATABASE_URL and 'postgresql' in config.DATABASE_URL}")
+        print(f"Full error trace:")
+        import traceback
+        traceback.print_exc()
         raise
 
 # Root endpoint
@@ -108,24 +123,25 @@ async def health_check():
 @app.get('/debug/database')
 async def debug_database():
     import re
-    safe_url = DATABASE_URL
-    if DATABASE_URL:
+    safe_url = config.DATABASE_URL
+    if safe_url:
         # Hide password in URL
-        safe_url = re.sub(r':([^:@]+)@', ':****@', DATABASE_URL)
+        safe_url = re.sub(r':([^:@]+)@', ':****@', safe_url)
     
     return {
-        "database_url_length": len(DATABASE_URL) if DATABASE_URL else 0,
-        "database_url_preview": safe_url,
-        "database_type": "postgresql" if DATABASE_URL and "postgresql" in DATABASE_URL else "mysql",
-        "environment": os.getenv("RENDER", "local")
+        "database_url": safe_url,
+        "database_type": "postgresql" if safe_url and "postgresql" in safe_url else "mysql",
+        "environment": "render" if os.getenv("RENDER") else "local",
+        "port": os.getenv("PORT", "8000")
     }
 
 # Run with Render port (10000)
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 8000))
+    print(f"🌐 Starting server on port {port}")
     uvicorn.run(
-        "main:app",  # Changed from "app.main:app" to "main:app"
+        "main:app",
         host="0.0.0.0", 
         port=port, 
-        reload=False  # Disable reload for production
+        reload=False
     )
