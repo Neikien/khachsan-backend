@@ -33,16 +33,15 @@ if config.DATABASE_URL and 'sqlite' in config.DATABASE_URL:
     )
     print("⚙️ SQLite config: No connection pooling")
 else:
-    # PostgreSQL/MySQL: dùng pool
+    # PostgreSQL/MySQL: dùng pool NHƯNG KHÔNG có pool_size, max_overflow
     engine = create_async_engine(
         config.DATABASE_URL,
         echo=False,
         pool_pre_ping=True,
         pool_recycle=300,
-        pool_size=5,
-        max_overflow=10,
+        # KHÔNG CÓ pool_size và max_overflow!
     )
-    print("⚙️ Database config: With connection pooling")
+    print("⚙️ Database config: With basic pooling (no pool_size/max_overflow)")
 
 # Async session
 AsyncSessionLocal = sessionmaker(
