@@ -23,15 +23,26 @@ if config.DATABASE_URL:
 # SQLAlchemy base class
 Base = declarative_base()
 
-# Database engine với config tốt hơn
-engine = create_async_engine(
-    config.DATABASE_URL,
-    echo=False,  # Tắt echo cho production
-    pool_pre_ping=True,
-    pool_recycle=300,
-    pool_size=5,
-    max_overflow=10,
-)
+# FIX: Config khác nhau cho SQLite vs các database khác
+if config.DATABASE_URL and 'sqlite' in config.DATABASE_URL:
+    # SQLite: không dùng pool parameters
+    engine = create_async_engine(
+        config.DATABASE_URL,
+        echo=False,
+        connect_args={"check_same_thread": False}
+    )
+    print("⚙️ SQLite config: No connection pooling")
+else:
+    # PostgreSQL/MySQL: dùng pool
+    engine = create_async_engine(
+        config.DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        pool_size=5,
+        max_overflow=10,
+    )
+    print("⚙️ Database config: With connection pooling")
 
 # Async session
 AsyncSessionLocal = sessionmaker(
