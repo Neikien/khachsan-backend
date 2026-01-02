@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Text, Date, Enum, ForeignKey 
+from sqlalchemy import Column, Integer, Text, Date, String, ForeignKey 
 from sqlalchemy.orm import relationship 
 from app.core.database import Base 
  
@@ -10,7 +10,6 @@ class Review(Base):
     Diem = Column(Integer) 
     NoiDung = Column(Text) 
     NgayDanhGia = Column(Date) 
-    TrangThai = Column(Enum('Hien thi', 'An'), default='Hien thi') 
+    TrangThai = Column(String(20), default='Hien thi')  # ← ĐÃ SỬA
  
-    # Relationships - SUA 
-    booking = relationship("Booking")  # BO back_populates 
+    booking = relationship("Booking")
