@@ -152,3 +152,17 @@ if __name__ == '__main__':
         reload=False,  # Tắt reload trên production
         log_level="info"
     )
+# THÊM ở cuối main.py
+if __name__ == "__main__":
+    import os
+    port = int(os.getenv("PORT", 8000))
+    print(f"🚀 Starting server on port {port}")
+    
+    # Giữ app chạy vĩnh viễn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False,
+        log_level="info"
+    )
