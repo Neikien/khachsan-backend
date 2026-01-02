@@ -27,3 +27,4 @@ typing_extensions==4.13.2
 urllib3==2.4.0
 email-validator>=2.0.0
 argon2-cffi 
+asyncpg==0.29.0  # THÊM DÒNG NÀY
