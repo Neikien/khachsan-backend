@@ -11,11 +11,15 @@ print("=" * 60)
 print("🚀 STARTUP CHECK - GROQ PACKAGE STATUS")
 print("=" * 60)
 
-# Check 1: Package installation
+# Check 1: Package installation (cẩn thận với version cũ)
 try:
     import groq
     GROQ_INSTALLED = True
-    GROQ_VERSION = groq.__version__
+    # Version cũ có thể không có __version__
+    try:
+        GROQ_VERSION = groq.__version__
+    except AttributeError:
+        GROQ_VERSION = "unknown (old version)"
     print(f"✅ GROQ INSTALLED - Version: {GROQ_VERSION}")
 except ImportError:
     GROQ_INSTALLED = False
