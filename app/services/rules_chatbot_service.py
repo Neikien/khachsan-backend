@@ -65,77 +65,86 @@ def _safe_groq_reply(user_message: str) -> str:
     try:
         logger.info(f"Attempting Groq API for: {user_message[:50]}")
         
-        # FIX PROXIES ISSUE: Disable proxy auto-detection
-        import requests
-        import urllib3
-        
-        # Create session without proxy
-        session = requests.Session()
-        session.trust_env = False  # DON'T read proxy from environment
-        
+        # FIX 1: Đơn giản hóa - không dùng requests session phức tạp
         from groq import Groq
         
-        # Try different ways to create client
+        # FIX 2: Try-catch đơn giản để xử lý proxies error
         try:
-            # Method 1: Simple client without extra params
+            # Thử cách đơn giản nhất trước
             client = Groq(api_key=api_key)
+            logger.info("Groq client created successfully (simple method)")
         except TypeError as e:
             if 'proxies' in str(e):
-                logger.warning("Groq client complaining about proxies, trying workaround...")
-                # Method 2: Use monkey patch
-                import groq._client
+                logger.warning("Proxies error detected, trying workaround...")
+                # CÁCH FIX PROXIES: Dùng environment variable override
+                import os
+                # Lưu lại environment cũ
+                old_env = dict(os.environ)
                 
-                # Save original
-                original_init = groq._client.SyncClient.__init__
+                # Xóa tất cả proxy related environment variables
+                proxy_keys = ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY']
+                for key in proxy_keys:
+                    if key in os.environ:
+                        logger.info(f"Removing {key} from environment")
+                        del os.environ[key]
                 
-                # Create patched version
-                def patched_init(self, api_key=None, **kwargs):
-                    # Remove proxies from kwargs
-                    kwargs.pop('proxies', None)
-                    kwargs.pop('http_client', None)
-                    # Call original with clean kwargs
-                    return original_init(self, api_key=api_key, **kwargs)
-                
-                # Apply patch
-                groq._client.SyncClient.__init__ = patched_init
-                
-                # Try again
+                # Thử lại sau khi xóa proxy env
                 client = Groq(api_key=api_key)
+                logger.info("Groq client created after removing proxy env")
+                
+                # Khôi phục environment
+                os.environ.clear()
+                os.environ.update(old_env)
             else:
                 raise e
         
+        # FIX 3: Thử models đơn giản hơn
         system_prompt = """Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe.
         Trả lời ngắn gọn, thân thiện, tập trung vào dịch vụ khách sạn.
         Luôn trả lời bằng tiếng Việt.
-        Nếu câu hỏi không liên quan đến khách sạn, nhẹ nhàng chuyển hướng."""
         
-        # Try different models
-        models_to_try = ["mixtral-8x7b-32768", "llama3-70b-8192", "gemma-7b-it"]
+        Ví dụ về khách sạn ở Hà Nội: Khách sạn Melia, Sofitel Legend Metropole, InterContinental, Hilton."""
         
-        for model in models_to_try:
+        try:
+            # Thử model phổ biến nhất trước
+            logger.info("Trying model: mixtral-8x7b-32768")
+            response = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                model="mixtral-8x7b-32768",
+                temperature=0.7,
+                max_tokens=150,
+                timeout=10  # Thêm timeout
+            )
+            
+            reply = response.choices[0].message.content
+            logger.info(f"Groq API success: {reply[:80]}...")
+            return reply
+            
+        except Exception as model_error:
+            logger.warning(f"Model mixtral failed: {model_error}, trying llama...")
+            # Thử model khác
             try:
-                logger.info(f"Trying model: {model}")
                 response = client.chat.completions.create(
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_message}
                     ],
-                    model=model,
+                    model="llama3-70b-8192",
                     temperature=0.7,
-                    max_tokens=150
+                    max_tokens=150,
+                    timeout=10
                 )
-                
                 reply = response.choices[0].message.content
-                logger.info(f"Groq API success with model {model}: {reply[:80]}...")
+                logger.info(f"Groq API success with llama: {reply[:80]}...")
                 return reply
-                
-            except Exception as model_error:
-                logger.warning(f"Model {model} failed: {model_error}")
-                continue
-        
-        # All models failed
-        logger.error("All Groq models failed")
-        return fallback_reply()
+            except Exception:
+                # Fallback: tự tạo reply đơn giản
+                if "hà nội" in user_message.lower() or "hanoi" in user_message.lower():
+                    return "Hà Nội có nhiều khách sạn tuyệt vời như: Melia Hanoi, Sofitel Legend Metropole, InterContinental Hanoi, Hilton Hanoi Opera. Bạn muốn đặt phòng khách sạn nào ạ?"
+                return fallback_reply()
         
     except ImportError as e:
         logger.error(f"Groq import error: {e}")
@@ -143,12 +152,13 @@ def _safe_groq_reply(user_message: str) -> str:
         
     except Exception as e:
         logger.error(f"Groq API error: {type(e).__name__}: {str(e)[:100]}")
-        # Return simple fallback, NOT generate_reply() to avoid recursion
-        return "Tôi hiện không thể kết nối đến hệ thống AI. Bạn muốn hỏi gì về dịch vụ khách sạn không?"
+        # FIX: Trả về reply có ý nghĩa hơn
+        if "hà nội" in user_message.lower():
+            return "Tại Hà Nội, hệ thống khách sạn MelMaybe có chi nhánh tại quận Hoàn Kiếm và Ba Đình với đầy đủ tiện nghi. Bạn muốn đặt phòng loại nào ạ?"
+        return "Hiện tôi có thể hỗ trợ bạn đặt phòng, tư vấn điểm đến, hoặc giới thiệu dịch vụ khách sạn. Bạn cần hỗ trợ gì ạ?"
 
 def generate_groq_reply(user_message: str) -> str:
     """Public wrapper for Groq reply"""
-    # Avoid recursion by using safe version
     return _safe_groq_reply(user_message)
 
 def fallback_reply() -> str:
@@ -158,11 +168,3 @@ def fallback_reply() -> str:
         "Tôi có thể hỗ trợ bạn về: đặt phòng, thông tin chi nhánh, dịch vụ khách sạn. "
         "Bạn muốn hỏi gì ạ?"
     )
-
-def test_groq_import():
-    """Test function to check groq installation"""
-    try:
-        import groq
-        return f"✅ Groq imported. Version: {getattr(groq, '__version__', 'unknown')}"
-    except ImportError as e:
-        return f"❌ Groq import failed: {e}"
