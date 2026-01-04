@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.schemas.chatbot_schema import ChatRequest, ChatResponse
-from app.services.chatbot_service import generate_reply
+from app.services.rules_chatbot_service import generate_reply 
 
 router = APIRouter(prefix="/chatbot", tags=["Chatbot"])
 
