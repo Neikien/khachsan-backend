@@ -27,7 +27,6 @@ SUGGESTIONS = {
 def generate_reply(message: str) -> str:
     msg = message.lower()
 
-    # THÊM NHIỀU TỪ KHÓA HƠN
     if any(w in msg for w in ["đi đâu", "địa điểm", "du lịch", "tham quan", "nên đi"]):
         return random.choice(SUGGESTIONS["destination"])
 
@@ -40,8 +39,38 @@ def generate_reply(message: str) -> str:
     if any(w in msg for w in ["hỗ trợ", "liên hệ", "phản hồi", "chăm sóc", "hotline"]):
         return random.choice(SUGGESTIONS["support"])
 
-    # TẠM COMMENT GROQ - CHỈ DÙNG RULE-BASED
-    return fallback_reply()
+    # Nếu không match rule, DÙNG GROQ AI
+    return generate_groq_reply(message)
+
+def generate_groq_reply(user_message: str) -> str:
+    """Generate reply using Groq API"""
+    api_key = os.getenv("apikey")
+    
+    if not api_key:
+        return fallback_reply()
+    
+    try:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        
+        system_prompt = """Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe.
+        Trả lời ngắn gọn, thân thiện, tập trung vào dịch vụ khách sạn."""
+        
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            model="llama3-70b-8192",
+            temperature=0.7,
+            max_tokens=150
+        )
+        return response.choices[0].message.content
+        
+    except ImportError:
+        return "❌ Lỗi: Package 'groq' chưa được cài đặt. Vui lòng thêm 'groq' vào requirements.txt"
+    except Exception as e:
+        return f"❌ Lỗi Groq API: {str(e)[:80]}"
 
 def fallback_reply() -> str:
     return (
@@ -49,32 +78,3 @@ def fallback_reply() -> str:
         "Tôi có thể hỗ trợ bạn về: đặt phòng, thông tin chi nhánh, dịch vụ khách sạn. "
         "Bạn muốn hỏi gì ạ?"
     )
-
-# TẠM ẨN GROQ CHO ĐẾN KHI FIX
-'''
-def generate_groq_reply(user_message: str) -> str:
-    api_key = os.getenv("apikey")
-    
-    if not api_key:
-        return "⚠️ Không tìm thấy API key"
-    
-    try:
-        from groq import Groq
-        client = Groq(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "Bạn là trợ lý khách sạn..."},
-                {"role": "user", "content": user_message}
-            ],
-            model="llama3-70b-8192",
-            temperature=0.7,
-            max_tokens=100
-        )
-        return response.choices[0].message.content
-        
-    except ImportError:
-        return "❌ Chưa cài package 'groq'. Chạy: pip install groq"
-    except Exception as e:
-        return f"❌ Lỗi API: {str(e)[:50]}"
-'''
