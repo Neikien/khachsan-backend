@@ -9,7 +9,7 @@ class Room(Base):
     MaKS = Column(Integer, ForeignKey("KHACH_SAN.MaKS")) 
     LoaiPhong = Column(String(50), nullable=False) 
     GiaPhong = Column(Numeric(10, 2), nullable=False) 
-    TinhTrang = Column(String(20), default='Trống')  # ← ĐÃ SỬA
+    TinhTrang = Column(String(20), default='Trống')
  
-    hotel = relationship("Hotel")  
-    bookings = relationship("Booking") 
+    hotel = relationship("Hotel", back_populates="rooms")  
+    bookings = relationship("Booking", back_populates="room")  # ← THÊM back_populates
