@@ -3,7 +3,6 @@ import os
 
 load_dotenv()
 
-
 class Config:
     DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -30,6 +29,8 @@ class Config:
 
     AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
     AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
-
+    
+    # THÊM DÒNG NÀY CHO CHATBOT
+    CHATBOT_API_KEY = os.getenv("apikey")  # Lấy từ biến 'apikey' trên Railway
 
 config = Config()
