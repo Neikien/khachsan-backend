@@ -18,5 +18,6 @@ email-validator>=2.0.0
 argon2-cffi 
 asyncpg==0.29.0
 aiosqlite==0.20.0
-groq==0.3.0  # ← THÊM VÀO ĐÂY
+groq==0.3.0
+
 
