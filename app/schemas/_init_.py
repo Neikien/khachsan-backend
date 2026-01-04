@@ -8,7 +8,7 @@ from .booking import BookingCreate, BookingUpdate, BookingResponse
 from .service import ServiceCreate, ServiceUpdate, ServiceResponse
 from .review import ReviewCreate, ReviewUpdate, ReviewResponse
 from .activity import ActivityLogCreate, ActivityLogResponse
-
+from .service_usage import ServiceUsageCreate, ServiceUsageUpdate, ServiceUsageResponse
 __all__ = [
     'SignupRequest', 'LoginRequest', 'UserResponse', 'UserUpdate', 'TokenResponse',
     'UserCreate', 'UserUpdate', 'UserResponse',
@@ -19,5 +19,6 @@ __all__ = [
     'BookingCreate', 'BookingUpdate', 'BookingResponse',
     'ServiceCreate', 'ServiceUpdate', 'ServiceResponse',
     'ReviewCreate', 'ReviewUpdate', 'ReviewResponse',
-    'ActivityLogCreate', 'ActivityLogResponse'
+    'ActivityLogCreate', 'ActivityLogResponse',
+    'ServiceUsageCreate', 'ServiceUsageUpdate', 'ServiceUsageResponse'
 ]
