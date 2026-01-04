@@ -11,7 +11,10 @@ class Customer(Base):
     Email = Column(String(100))
     CCCD = Column(String(20))
     DiaChi = Column(String(255))
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True)  # THÊM DÒNG NÀY
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
     
-    # Optional: relationship nếu cần
+    # Relationships
     user = relationship("User", back_populates="customer")
+    
+    # THÊM DÒNG NÀY - QUAN TRỌNG
+    bookings = relationship("Booking", back_populates="customer")  # ← THÊM
