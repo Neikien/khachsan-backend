@@ -28,7 +28,12 @@ SUGGESTIONS = {
 }
 
 def generate_reply(message: str) -> str:
+    """Generate reply with fallback to avoid recursion"""
     msg = message.lower()
+
+    # Check for groq/AI questions first
+    if any(w in msg for w in ["groq", "ai", "trí tuệ nhân tạo", "artificial"]):
+        return "🤖 Tôi sử dụng Groq AI để trả lời các câu hỏi phức tạp về khách sạn!"
 
     if any(w in msg for w in ["đi đâu", "địa điểm", "du lịch", "tham quan", "nên đi"]):
         return random.choice(SUGGESTIONS["destination"])
@@ -42,11 +47,15 @@ def generate_reply(message: str) -> str:
     if any(w in msg for w in ["hỗ trợ", "liên hệ", "phản hồi", "chăm sóc", "hotline"]):
         return random.choice(SUGGESTIONS["support"])
 
-    # Nếu không match rule, DÙNG GROQ AI
-    return generate_groq_reply(message)
+    # If not match rule, try Groq AI but avoid recursion
+    try:
+        return _safe_groq_reply(message)
+    except Exception as e:
+        logger.error(f"All reply methods failed: {e}")
+        return fallback_reply()
 
-def generate_groq_reply(user_message: str) -> str:
-    """Generate reply using Groq API"""
+def _safe_groq_reply(user_message: str) -> str:
+    """Safe Groq API call without recursion"""
     api_key = os.getenv("apikey")
     
     if not api_key:
@@ -54,69 +63,106 @@ def generate_groq_reply(user_message: str) -> str:
         return fallback_reply()
     
     try:
-        # THỬ IMPORT GROQ - LOG để debug
-        logger.info(f"Attempting to import groq for message: {user_message[:50]}")
+        logger.info(f"Attempting Groq API for: {user_message[:50]}")
+        
+        # FIX PROXIES ISSUE: Disable proxy auto-detection
+        import requests
+        import urllib3
+        
+        # Create session without proxy
+        session = requests.Session()
+        session.trust_env = False  # DON'T read proxy from environment
+        
         from groq import Groq
         
-        logger.info(f"Creating Groq client with API key length: {len(api_key)}")
-        client = Groq(api_key=api_key)
+        # Try different ways to create client
+        try:
+            # Method 1: Simple client without extra params
+            client = Groq(api_key=api_key)
+        except TypeError as e:
+            if 'proxies' in str(e):
+                logger.warning("Groq client complaining about proxies, trying workaround...")
+                # Method 2: Use monkey patch
+                import groq._client
+                
+                # Save original
+                original_init = groq._client.SyncClient.__init__
+                
+                # Create patched version
+                def patched_init(self, api_key=None, **kwargs):
+                    # Remove proxies from kwargs
+                    kwargs.pop('proxies', None)
+                    kwargs.pop('http_client', None)
+                    # Call original with clean kwargs
+                    return original_init(self, api_key=api_key, **kwargs)
+                
+                # Apply patch
+                groq._client.SyncClient.__init__ = patched_init
+                
+                # Try again
+                client = Groq(api_key=api_key)
+            else:
+                raise e
         
         system_prompt = """Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe.
         Trả lời ngắn gọn, thân thiện, tập trung vào dịch vụ khách sạn.
-        Luôn trả lời bằng tiếng Việt."""
+        Luôn trả lời bằng tiếng Việt.
+        Nếu câu hỏi không liên quan đến khách sạn, nhẹ nhàng chuyển hướng."""
         
-        logger.info(f"Sending request to Groq API with model: llama3-70b-8192")
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            model="llama3-70b-8192",
-            temperature=0.7,
-            max_tokens=150
-        )
+        # Try different models
+        models_to_try = ["mixtral-8x7b-32768", "llama3-70b-8192", "gemma-7b-it"]
         
-        reply = response.choices[0].message.content
-        logger.info(f"Groq API response received: {reply[:100]}...")
-        return reply
+        for model in models_to_try:
+            try:
+                logger.info(f"Trying model: {model}")
+                response = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message}
+                    ],
+                    model=model,
+                    temperature=0.7,
+                    max_tokens=150
+                )
+                
+                reply = response.choices[0].message.content
+                logger.info(f"Groq API success with model {model}: {reply[:80]}...")
+                return reply
+                
+            except Exception as model_error:
+                logger.warning(f"Model {model} failed: {model_error}")
+                continue
+        
+        # All models failed
+        logger.error("All Groq models failed")
+        return fallback_reply()
         
     except ImportError as e:
-        # THÊM LOG CHI TIẾT
-        logger.error(f"Groq ImportError: {e}")
-        logger.error("Groq package may be installed but not importable")
-        
-        # Thử kiểm tra phiên bản cũ của groq
-        try:
-            import groq
-            logger.info(f"Groq module exists but can't import Groq class. Module: {dir(groq)}")
-            # Nếu phiên bản cũ dùng groq.Client thay vì Groq
-            if hasattr(groq, 'Client'):
-                client = groq.Client(api_key=api_key)
-                # ... code xử lý tiếp ...
-                return "⚠️ Phiên bản Groq cũ đã được phát hiện, đang xử lý..."
-        except Exception as inner_e:
-            logger.error(f"Even basic groq import failed: {inner_e}")
-        
-        # FALLBACK: Dùng rule-based thay vì thông báo lỗi
-        return generate_reply(user_message)
+        logger.error(f"Groq import error: {e}")
+        return "⚠️ Hệ thống AI đang được cập nhật. Bạn có thể hỏi về đặt phòng, giá cả, dịch vụ khách sạn."
         
     except Exception as e:
-        logger.error(f"Groq API Exception: {type(e).__name__}: {str(e)[:200]}")
-        # Fallback an toàn
-        return f"🤖 Hiện tại hệ thống AI đang bận. {generate_reply(user_message)}"
+        logger.error(f"Groq API error: {type(e).__name__}: {str(e)[:100]}")
+        # Return simple fallback, NOT generate_reply() to avoid recursion
+        return "Tôi hiện không thể kết nối đến hệ thống AI. Bạn muốn hỏi gì về dịch vụ khách sạn không?"
+
+def generate_groq_reply(user_message: str) -> str:
+    """Public wrapper for Groq reply"""
+    # Avoid recursion by using safe version
+    return _safe_groq_reply(user_message)
 
 def fallback_reply() -> str:
+    """Simple fallback without calling other reply functions"""
     return (
         "Xin chào! Tôi là trợ lý ảo của hệ thống khách sạn MelMaybe. "
         "Tôi có thể hỗ trợ bạn về: đặt phòng, thông tin chi nhánh, dịch vụ khách sạn. "
         "Bạn muốn hỏi gì ạ?"
     )
 
-# Thêm hàm test để debug
 def test_groq_import():
     """Test function to check groq installation"""
     try:
         import groq
-        return f"✅ Groq imported successfully. Module attributes: {[x for x in dir(groq) if not x.startswith('_')]}"
+        return f"✅ Groq imported. Version: {getattr(groq, '__version__', 'unknown')}"
     except ImportError as e:
         return f"❌ Groq import failed: {e}"
