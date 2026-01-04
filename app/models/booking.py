@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, Date, Numeric, Enum, ForeignKey
+from sqlalchemy import Column, Integer, Date, Numeric, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import date  # THÊM IMPORT NÀY!
+from datetime import date
 from app.core.database import Base
 
 class Booking(Base):
@@ -10,22 +10,16 @@ class Booking(Base):
     MaKH = Column(Integer, ForeignKey("KHACH_HANG.MaKH"), nullable=False)
     MaPhong = Column(Integer, ForeignKey("PHONG.MaPhong"), nullable=False)
     
-    # THÊM TRƯỜNG NÀY - RẤT QUAN TRỌNG!
-    NgayDat = Column(Date, default=date.today, nullable=False)  # Ngày đặt, mặc định là hôm nay
-    
+    NgayDat = Column(Date, default=date.today, nullable=False)
     NgayNhanPhong = Column(Date, nullable=False)
     NgayTraPhong = Column(Date, nullable=False)
-    TongTien = Column(Numeric(10, 2), nullable=True)  # Cho phép NULL nếu chưa tính
-
+    TongTien = Column(Numeric(10, 2), nullable=True)
+    
+    # THAY ENUM BẰNG VARCHAR
     TrangThai = Column(
-        Enum(
-            "Da thanh toan",
-            "Chua thanh toan", 
-            "Huy",
-            name="booking_trangthai_enum"
-        ),
-        default="Chua thanh toan",  # TRÙNG VỚI SCHEMA
-        nullable=False
+        'TrangThai',  # Tên cột
+        nullable=False,
+        default='Chua thanh toan'  # Giá trị mặc định
     )
 
     customer = relationship("Customer", back_populates="bookings")
