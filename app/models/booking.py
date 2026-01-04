@@ -10,7 +10,7 @@ class Booking(Base):
     MaKH = Column(Integer, ForeignKey("KHACH_HANG.MaKH"), nullable=False)
     MaPhong = Column(Integer, ForeignKey("PHONG.MaPhong"), nullable=False)
     
-    NgayDat = Column(Date, default=date.today, nullable=False)
+    NgayDat = Column('ngaydat', Date, default=date.today, nullable=False)
     NgayNhanPhong = Column(Date, nullable=False)
     NgayTraPhong = Column(Date, nullable=False)
     TongTien = Column(Numeric(10, 2), nullable=True)
@@ -25,3 +25,4 @@ class Booking(Base):
     customer = relationship("Customer", back_populates="bookings")
     room = relationship("Room", back_populates="bookings")
     reviews = relationship("Review", back_populates="booking")
+
