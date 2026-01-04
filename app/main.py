@@ -1,30 +1,25 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 import os
 import uvicorn
 import logging
 
 # ==================== CONFIGURE LOGGING ====================
-# Cấu hình logging chi tiết
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.StreamHandler(),  # Ghi ra console
-        # logging.FileHandler('app.log')  # Có thể thêm ghi file
-    ]
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
 
-# DEBUG NGAY ĐẦU
 print("=" * 60)
 print("🎯 MAIN.PY STARTING - RAILWAY DEPLOYMENT")
 print("=" * 60)
 print(f"Python version: {os.sys.version}")
 print(f"Current directory: {os.getcwd()}")
 
-# Import config để xem DATABASE_URL
 from app.core.config import config
 print(f"Config DATABASE_URL: {config.DATABASE_URL[:80] if config.DATABASE_URL else 'None'}")
 
@@ -53,19 +48,12 @@ app = FastAPI(
     title="Hotel Management API",
     description="Hệ thống quản lý khách sạn",
     version="1.0.0",
-    # Thêm middleware logging
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
 # ==================== CORS CONFIG ====================
-origins = [
-    "http://localhost:3000",
-    "http://localhost:3001", 
-    "https://khachsan-backend.onrender.com",
-    "*"  # Tạm thời cho dev
-]
-
+origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -75,7 +63,6 @@ app.add_middleware(
 )
 
 # ==================== MIDDLEWARE FOR LOGGING ====================
-# Middleware để log mọi request
 @app.middleware("http")
 async def log_requests(request, call_next):
     logger.info(f"🌐 {request.method} {request.url.path}")
@@ -84,7 +71,7 @@ async def log_requests(request, call_next):
         logger.info(f"📊 {request.method} {request.url.path} - Status: {response.status_code}")
         return response
     except Exception as e:
-        logger.error(f"💥 Error in {request.method} {request.url.path}: {str(e)}")
+        logger.error(f"💥 Error: {str(e)}")
         raise
 
 # ==================== INCLUDE ROUTERS ====================
@@ -100,20 +87,18 @@ app.include_router(chatbot_router)
 @app.on_event("startup")
 async def startup_event():
     try:
-        logger.info(f"🔗 Attempting to connect to database...")
-        print(f"Database URL from engine: {str(engine.url)[:80]}...")
+        logger.info("🔗 Connecting to database...")
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        logger.info("✅ Database tables created successfully")
+        logger.info("✅ Database tables created")
         
-        # Test connection
         async with engine.connect() as conn:
-            await conn.execute("SELECT 1")
+            await conn.execute(text("SELECT 1"))
         logger.info("✅ Database connection test successful")
         
     except Exception as e:
-        logger.error(f"⚠️ Database initialization error: {type(e).__name__}: {e}")
+        logger.error(f"⚠️ Database error: {type(e).__name__}: {e}")
         import traceback
         logger.error(traceback.format_exc())
 
@@ -131,9 +116,8 @@ async def root():
 @app.get('/health')
 async def health_check():
     try:
-        # Test database connection
         async with engine.connect() as conn:
-            result = await conn.execute("SELECT 1")
+            result = await conn.execute(text("SELECT 1"))
             await result.fetchone()
         
         return {
@@ -152,16 +136,12 @@ async def health_check():
 
 @app.get('/test')
 async def test():
-    return {
-        "message": "API is working",
-        "timestamp": os.path.getmtime(__file__) if os.path.exists(__file__) else "unknown"
-    }
+    return {"message": "API is working"}
 
 # ==================== ERROR HANDLING ====================
-# Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    logger.error(f"💥 Unhandled exception at {request.url.path}: {exc}", exc_info=True)
+    logger.error(f"💥 Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": f"Internal Server Error: {str(exc)}"},
@@ -171,18 +151,10 @@ async def global_exception_handler(request, exc):
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 8000))
     print(f"🌐 Starting server on port {port}")
-    print(f"📖 API docs: http://localhost:{port}/docs")
-    
-    # Bật debug logging cho uvicorn
-    log_config = uvicorn.config.LOGGING_CONFIG
-    log_config["formatters"]["access"]["fmt"] = '%(asctime)s - %(levelname)s - %(message)s'
-    log_config["formatters"]["default"]["fmt"] = '%(asctime)s - %(levelname)s - %(message)s'
-    
     uvicorn.run(
         app,
         host="0.0.0.0", 
         port=port, 
         reload=False,
-        log_level="debug",  # Đặt log_level thành debug
-        access_log=True
+        log_level="info"
     )
