@@ -4,6 +4,7 @@ from .room import router as room_router
 from .booking import router as booking_router
 from .customer import router as customer_router
 from .service import router as service_router
+from .service_usage_controller import router as service_usage_router
 
 __all__ = [
     'auth_router',
@@ -11,5 +12,6 @@ __all__ = [
     'room_router',
     'booking_router',
     'customer_router',
-    'service_router'
+    'service_router',
+    'service_usage_router'
 ]
