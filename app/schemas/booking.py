@@ -5,20 +5,20 @@ from datetime import date
 from enum import Enum
 
 class BookingStatus(str, Enum):
-    da_thanh_toan = 'Đã thanh toán'
-    chua_thanh_toan = 'Chưa thanh toán'
-    huy = 'Hủy'
-    da_dat = 'Đã đặt'  # THÊM TRẠNG THÁI NÀY!
+    # PHẢI KHỚP CHÍNH XÁC với Enum trong database!
+    da_thanh_toan = 'Da thanh toan'      # ← KHÔNG DẤU, KHÔNG VIẾT HOA
+    chua_thanh_toan = 'Chua thanh toan'  # ← KHÔNG DẤU, KHÔNG VIẾT HOA  
+    huy = 'Huy'                          # ← KHÔNG DẤU, KHÔNG VIẾT HOA
+    # KHÔNG CÓ "Đã đặt" vì database không có!
 
 class BookingCreate(BaseModel):
     MaKH: int
     MaPhong: int
     NgayNhanPhong: date
     NgayTraPhong: date
-    # THÊM 2 TRƯỜNG NÀY VỚI GIÁ TRỊ DEFAULT
     NgayDat: date = Field(default_factory=date.today)
-    TrangThai: str = Field(default="Đã đặt")
-    # Thêm TongTien nếu cần
+    # SỬA LẠI CHO ĐÚNG VỚI DATABASE!
+    TrangThai: BookingStatus = Field(default=BookingStatus.chua_thanh_toan)  # ← DÙNG ENUM
     TongTien: Optional[Decimal] = None
 
 class BookingUpdate(BaseModel):
@@ -31,7 +31,7 @@ class BookingResponse(BaseModel):
     MaDatPhong: int
     MaKH: int
     MaPhong: int
-    NgayDat: date  # THÊM VÀO RESPONSE
+    NgayDat: date
     NgayNhanPhong: date
     NgayTraPhong: date
     TongTien: Optional[Decimal]
