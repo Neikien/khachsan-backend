@@ -6,6 +6,33 @@ import os
 import uvicorn
 import logging
 
+# ==================== CHECK GROQ NGAY KHI IMPORT ====================
+print("=" * 60)
+print("🚀 STARTUP CHECK - GROQ PACKAGE STATUS")
+print("=" * 60)
+
+# Check 1: Package installation
+try:
+    import groq
+    GROQ_INSTALLED = True
+    GROQ_VERSION = groq.__version__
+    print(f"✅ GROQ INSTALLED - Version: {GROQ_VERSION}")
+except ImportError:
+    GROQ_INSTALLED = False
+    GROQ_VERSION = "NOT INSTALLED"
+    print("❌ GROQ NOT INSTALLED - Package missing")
+
+# Check 2: API Key
+API_KEY = os.getenv("apikey")
+if API_KEY:
+    print(f"✅ API KEY EXISTS - Length: {len(API_KEY)} chars")
+    print(f"   Preview: {API_KEY[:10]}...")
+else:
+    print("❌ API KEY MISSING - Check Railway Variables")
+
+print("=" * 60)
+# ==================== END CHECK ====================
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -13,6 +40,8 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
+
+# ... phần còn lại của main.py giữ nguyên ...
 
 from app.core.config import config
 
