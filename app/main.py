@@ -25,7 +25,7 @@ from app.controllers.chatbot_controller import router as chatbot_router
 from app.controllers.service_usage_controller import router as service_usage_router
 
 from app.core.database import engine, Base
-from app.models import user, area, hotel, room, customer, booking, service, review, activity_log
+from app.models import user, area, hotel, room, customer, booking, service, review, activity_log, service_usage
 
 app = FastAPI(
     title="Hotel Management API",
