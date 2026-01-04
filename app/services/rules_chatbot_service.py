@@ -1,4 +1,3 @@
-# app/services/rules_chatbot_service.py - SỬA PHẦN GROQ
 import os
 import random
 
@@ -28,56 +27,21 @@ SUGGESTIONS = {
 def generate_reply(message: str) -> str:
     msg = message.lower()
 
-    if any(w in msg for w in ["đi đâu", "địa điểm", "du lịch", "tham quan"]):
+    # THÊM NHIỀU TỪ KHÓA HƠN
+    if any(w in msg for w in ["đi đâu", "địa điểm", "du lịch", "tham quan", "nên đi"]):
         return random.choice(SUGGESTIONS["destination"])
 
-    if any(w in msg for w in ["phòng", "giá", "đặt", "còn trống"]):
+    if any(w in msg for w in ["phòng", "giá", "đặt", "còn trống", "bao nhiêu", "đơn", "đôi", "suite"]):
         return random.choice(SUGGESTIONS["room"])
 
-    if any(w in msg for w in ["chi nhánh", "địa chỉ", "cơ sở"]):
+    if any(w in msg for w in ["chi nhánh", "địa chỉ", "cơ sở", "ở đâu", "vị trí"]):
         return random.choice(SUGGESTIONS["branch"])
 
-    if any(w in msg for w in ["hỗ trợ", "liên hệ", "phản hồi", "chăm sóc"]):
+    if any(w in msg for w in ["hỗ trợ", "liên hệ", "phản hồi", "chăm sóc", "hotline"]):
         return random.choice(SUGGESTIONS["support"])
 
-    # Nếu không match rule, THỬ dùng Groq AI
-    try:
-        return generate_groq_reply(message)
-    except:
-        # Fallback nếu Groq lỗi
-        return fallback_reply()
-
-def generate_groq_reply(user_message: str) -> str:
-    """Generate reply using Groq API (chỉ chạy nếu có API key)"""
-    api_key = os.getenv("apikey")  # Đọc trực tiếp từ biến môi trường
-    
-    if not api_key or api_key == "":
-        return fallback_reply()  # Không có API key, dùng fallback
-    
-    try:
-        from groq import Groq  # Import trong function để tránh lỗi nếu không cài
-        
-        client = Groq(api_key=api_key)  # ← ĐÚNG: Groq() chứ không phải groq.Client()
-        
-        system_prompt = """Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe."""
-        
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            model="llama3-70b-8192",
-            temperature=0.7,
-            max_tokens=300
-        )
-        
-        return response.choices[0].message.content
-        
-    except ImportError:
-        return "Chatbot AI đang bảo trì. Vui lòng thử lại sau."
-    except Exception as e:
-        print(f"❌ Lỗi Groq API: {type(e).__name__}: {e}")
-        return fallback_reply()
+    # TẠM COMMENT GROQ - CHỈ DÙNG RULE-BASED
+    return fallback_reply()
 
 def fallback_reply() -> str:
     return (
@@ -85,3 +49,32 @@ def fallback_reply() -> str:
         "Tôi có thể hỗ trợ bạn về: đặt phòng, thông tin chi nhánh, dịch vụ khách sạn. "
         "Bạn muốn hỏi gì ạ?"
     )
+
+# TẠM ẨN GROQ CHO ĐẾN KHI FIX
+'''
+def generate_groq_reply(user_message: str) -> str:
+    api_key = os.getenv("apikey")
+    
+    if not api_key:
+        return "⚠️ Không tìm thấy API key"
+    
+    try:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "Bạn là trợ lý khách sạn..."},
+                {"role": "user", "content": user_message}
+            ],
+            model="llama3-70b-8192",
+            temperature=0.7,
+            max_tokens=100
+        )
+        return response.choices[0].message.content
+        
+    except ImportError:
+        return "❌ Chưa cài package 'groq'. Chạy: pip install groq"
+    except Exception as e:
+        return f"❌ Lỗi API: {str(e)[:50]}"
+'''
