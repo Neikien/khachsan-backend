@@ -1,4 +1,5 @@
-from fastapi import FastAPI, JSONResponse
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse  # ĐÚNG VỊ TRÍ
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 import os
