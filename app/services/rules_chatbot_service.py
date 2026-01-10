@@ -1,6 +1,8 @@
 import os
 import random
 import logging
+from app.services.chatbot_service import chatbot_service
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -29,23 +31,16 @@ SUGGESTIONS = {
 
 def generate_reply(message: str) -> str:
     msg = message.lower()
-
-    if any(w in msg for w in ["groq", "ai", "trí tuệ nhân tạo", "artificial"]):
-        return "🤖 Tôi sử dụng Groq AI để trả lời các câu hỏi phức tạp về khách sạn!"
-
-    if any(w in msg for w in ["đi đâu", "địa điểm", "du lịch", "tham quan", "nên đi"]):
-        return random.choice(SUGGESTIONS["destination"])
-
-    if any(w in msg for w in ["phòng", "giá", "đặt", "còn trống", "bao nhiêu", "đơn", "đôi", "suite"]):
-        return random.choice(SUGGESTIONS["room"])
-
-    if any(w in msg for w in ["chi nhánh", "địa chỉ", "cơ sở", "ở đâu", "vị trí"]):
-        return random.choice(SUGGESTIONS["branch"])
-
-    if any(w in msg for w in ["hỗ trợ", "liên hệ", "phản hồi", "chăm sóc", "hotline"]):
-        return random.choice(SUGGESTIONS["support"])
-
-    return _safe_groq_reply(message)
+    
+    # Các rule đơn giản
+    if any(w in msg for w in ["hotline", "số điện thoại", "liên hệ"]):
+        return "Hotline: 1800-9999 (24/7)"
+    
+    if any(w in msg for w in ["cảm ơn", "thanks", "thank you"]):
+        return "Cảm ơn bạn! Chúc bạn một ngày tốt lành!"
+    
+    # Gọi service mới (async)
+    return asyncio.run(chatbot_service.generate_reply(message))
 
 def _safe_groq_reply(user_message: str) -> str:
     print("\n" + "="*60)
