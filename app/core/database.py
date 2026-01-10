@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import config
+import os
 
 print("=" * 40)
 print("🔧 DATABASE CONFIGURATION")
@@ -33,26 +34,46 @@ if config.DATABASE_URL and 'sqlite' in config.DATABASE_URL:
     )
     print("⚙️ SQLite config: No connection pooling")
 else:
-    # PostgreSQL/MySQL: dùng pool NHƯNG KHÔNG có pool_size, max_overflow
+    # FIX CHO RAILWAY POSTGRESQL: Thêm pool parameters hợp lý
     engine = create_async_engine(
         config.DATABASE_URL,
         echo=False,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        # KHÔNG CÓ pool_size và max_overflow!
+        # THÊM CÁC THÔNG SỐ QUAN TRỌNG
+        pool_size=3,           # Số connection tối thiểu trong pool
+        max_overflow=2,        # Số connection tối đa khi vượt pool_size
+        pool_pre_ping=True,    # Kiểm tra connection trước khi dùng
+        pool_recycle=180,      # Tái sử dụng connection sau 3 phút (tránh timeout)
+        pool_timeout=10,       # Timeout khi lấy connection
+        connect_args={
+            "command_timeout": 10,  # Timeout cho mỗi query
+            "server_settings": {
+                "statement_timeout": "10000"  # 10 giây timeout
+            }
+        }
     )
-    print("⚙️ Database config: With basic pooling (no pool_size/max_overflow)")
+    print("⚙️ Railway PostgreSQL config: With optimized pooling")
+    print(f"   • pool_size: 3")
+    print(f"   • max_overflow: 2") 
+    print(f"   • pool_recycle: 180s (3 phút)")
+    print(f"   • pool_pre_ping: True")
 
 # Async session
 AsyncSessionLocal = sessionmaker(
     engine, 
     class_=AsyncSession, 
-    expire_on_commit=False
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
 )
 
 async def get_db():
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+    """Get database session với error handling"""
+    session = AsyncSessionLocal()
+    try:
+        yield session
+        await session.commit()
+    except Exception as e:
+        await session.rollback()
+        raise e
+    finally:
+        await session.close()
