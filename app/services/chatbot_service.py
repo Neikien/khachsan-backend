@@ -1,4 +1,3 @@
-# app/services/chatbot_service.py
 import os
 import logging
 from typing import Dict, List, Optional
@@ -12,14 +11,8 @@ class ChatbotService:
         self.api_key = os.getenv("apikey") or os.getenv("GROQ_API_KEY")
         self.base_url = os.getenv("GROQ_API_BASE", "https://api.groq.com/openai/v1")
         self.model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-        
-        print(f"\n🤖 ChatbotService initialized")
-        print(f"   API Key: {'✅' if self.api_key else '❌'} ({len(self.api_key) if self.api_key else 0} chars)")
-        print(f"   Base URL: {self.base_url}")
-        print(f"   Model: {self.model}")
     
     async def _query_database(self, query: str, params: Dict = None) -> List[Dict]:
-        """Execute SQL query and return results as dict"""
         try:
             async with engine.connect() as conn:
                 result = await conn.execute(text(query), params or {})
@@ -30,7 +23,6 @@ class ChatbotService:
             return []
     
     async def get_hotel_info(self) -> List[Dict]:
-        """Lấy thông tin khách sạn từ bảng KHACH_SAN"""
         try:
             hotels = await self._query_database("""
                 SELECT 
@@ -43,16 +35,12 @@ class ChatbotService:
                 ORDER BY MaKS
                 LIMIT 10
             """)
-            
-            print(f"🏨 Found {len(hotels)} hotels in database")
             return hotels
-            
         except Exception as e:
             logger.error(f"Error getting hotel info: {e}")
             return []
     
     async def get_room_info(self, hotel_id: Optional[int] = None) -> List[Dict]:
-        """Lấy thông tin phòng từ bảng PHONG"""
         try:
             if hotel_id:
                 rooms = await self._query_database("""
@@ -86,16 +74,12 @@ class ChatbotService:
                     ORDER BY p.MaKS, p.GiaPhong
                     LIMIT 20
                 """)
-            
-            print(f"🛏️ Found {len(rooms)} rooms in database")
             return rooms
-            
         except Exception as e:
             logger.error(f"Error getting room info: {e}")
             return []
     
     async def get_booking_stats(self) -> Dict:
-        """Lấy thống kê đặt phòng từ bảng DAT_PHONG"""
         try:
             stats = await self._query_database("""
                 SELECT 
@@ -104,70 +88,57 @@ class ChatbotService:
                     COUNT(CASE WHEN TrangThai = 'Đã xác nhận' THEN 1 END) as confirmed_bookings
                 FROM DAT_PHONG
             """)
-            
             return stats[0] if stats else {"total_bookings": 0, "today_bookings": 0, "confirmed_bookings": 0}
-            
         except Exception as e:
             logger.error(f"Error getting booking stats: {e}")
             return {"total_bookings": 0, "today_bookings": 0, "confirmed_bookings": 0}
     
     def _format_data_for_prompt(self, hotels: List[Dict], rooms: List[Dict], stats: Dict) -> str:
-        """Format database data for AI prompt"""
         prompt_parts = []
         
-        # Thống kê
-        prompt_parts.append(f"📊 **THỐNG KÊ HỆ THỐNG:**")
+        prompt_parts.append(f"📊 THỐNG KÊ HỆ THỐNG:")
         prompt_parts.append(f"- Tổng số booking: {stats.get('total_bookings', 0)}")
         prompt_parts.append(f"- Booking hôm nay: {stats.get('today_bookings', 0)}")
         prompt_parts.append(f"- Booking đã xác nhận: {stats.get('confirmed_bookings', 0)}")
         
-        # Thông tin khách sạn
         if hotels:
-            prompt_parts.append(f"\n🏨 **DANH SÁCH KHÁCH SẠN ({len(hotels)} khách sạn 5 sao):**")
-            for hotel in hotels[:5]:  # Hiển thị tối đa 5 khách sạn
+            prompt_parts.append(f"\n🏨 DANH SÁCH KHÁCH SẠN ({len(hotels)} khách sạn 5 sao):")
+            for hotel in hotels[:5]:
                 name = hotel.get('name', 'Khách sạn')
                 location = hotel.get('location', '')
                 stars = hotel.get('star_rating', 5)
-                prompt_parts.append(f"- **{name}**: {location[:50]}... ({stars} sao)")
+                prompt_parts.append(f"- {name}: {location[:50]}... ({stars} sao)")
         else:
-            prompt_parts.append("\n🏨 Hiện chưa có thông tin khách sạn trong database.")
+            prompt_parts.append("\n🏨 Chưa có thông tin khách sạn.")
         
-        # Thông tin phòng trống
         available_rooms = [r for r in rooms if r.get('status') == 'Trống']
         if available_rooms:
-            prompt_parts.append(f"\n🛏️ **PHÒNG TRỐNG HIỆN CÓ ({len(available_rooms)} phòng):**")
+            prompt_parts.append(f"\n🛏️ PHÒNG TRỐNG HIỆN CÓ ({len(available_rooms)} phòng):")
             
-            # Nhóm phòng theo khách sạn
             rooms_by_hotel = {}
-            for room in available_rooms[:10]:  # Hiển thị tối đa 10 phòng
+            for room in available_rooms[:10]:
                 hotel_name = room.get('hotel_name', 'Khách sạn')
                 if hotel_name not in rooms_by_hotel:
                     rooms_by_hotel[hotel_name] = []
                 rooms_by_hotel[hotel_name].append(room)
             
             for hotel_name, hotel_rooms in rooms_by_hotel.items():
-                prompt_parts.append(f"\n**{hotel_name}:**")
-                for room in hotel_rooms[:3]:  # Tối đa 3 phòng mỗi khách sạn
+                prompt_parts.append(f"\n{hotel_name}:")
+                for room in hotel_rooms[:3]:
                     room_type = room.get('room_type', '')
                     price = room.get('price', 0)
                     formatted_price = f"{price:,.0f} VND" if price else "Liên hệ"
                     prompt_parts.append(f"  - {room_type}: {formatted_price}/đêm")
         else:
-            prompt_parts.append("\n🛏️ Hiện không có phòng trống.")
+            prompt_parts.append("\n🛏️ Không có phòng trống.")
         
         return "\n".join(prompt_parts)
     
     async def generate_context(self, user_message: str) -> str:
-        """Tạo context từ database cho AI"""
-        print("\n" + "="*60)
-        print("📊 COLLECTING DATABASE DATA FOR CHATBOT")
-        
-        # Lấy data từ database
         hotels = await self.get_hotel_info()
         rooms = await self.get_room_info()
         stats = await self.get_booking_stats()
         
-        # Format context
         db_context = self._format_data_for_prompt(hotels, rooms, stats)
         
         full_context = f"""
@@ -175,9 +146,9 @@ class ChatbotService:
         
         ---
         
-        **CÂU HỎI CỦA KHÁCH:** {user_message}
+        CÂU HỎI CỦA KHÁCH: {user_message}
         
-        **HƯỚNG DẪN CHO AI:**
+        HƯỚNG DẪN CHO AI:
         - Trả lời dựa trên thông tin thực tế từ database ở trên
         - Nếu không có thông tin, thành thật nói "Hiện chưa có thông tin về..."
         - Luôn trả lời bằng tiếng Việt, thân thiện, chuyên nghiệp
@@ -186,29 +157,40 @@ class ChatbotService:
         - Giữ câu trả lời ngắn gọn, tập trung vào thông tin khách cần
         """
         
-        print(f"📝 Context length: {len(full_context)} chars")
-        print("="*60)
-        
         return full_context
     
-    async def generate_reply(self, user_message: str) -> str:
-        """Generate reply with real database data"""
+    def sync_generate_reply(self, user_message: str) -> str:
         try:
-            # Kiểm tra API key
+            import asyncio
+            
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(lambda: loop.run_until_complete(self.generate_reply(user_message)))
+                    return future.result()
+            else:
+                return loop.run_until_complete(self.generate_reply(user_message))
+                
+        except Exception as e:
+            logger.error(f"Error in sync_generate_reply: {e}")
+            return self._fallback_reply(user_message)
+    
+    async def generate_reply(self, user_message: str) -> str:
+        try:
             if not self.api_key:
-                print("❌ ERROR: No API key available")
                 return self._fallback_reply(user_message)
             
-            # Lấy context từ database
             context = await self.generate_context(user_message)
-            
-            print(f"\n🤖 SENDING TO GROQ AI...")
-            print(f"📝 User message: {user_message}")
             
             try:
                 from openai import OpenAI
                 
-                print("🔧 Using OpenAI client for Groq...")
                 client = OpenAI(
                     api_key=self.api_key,
                     base_url=self.base_url
@@ -219,11 +201,7 @@ class ChatbotService:
                     messages=[
                         {
                             "role": "system", 
-                            "content": """Bạn là trợ lý ảo thông minh của hệ thống khách sạn MelMaybe.
-                            Bạn có quyền truy cập vào database thực tế của hệ thống.
-                            LUÔN trả lời dựa trên thông tin thực tế được cung cấp từ database.
-                            Nếu không có thông tin trong database, thành thật nói "Hiện chưa có thông tin về vấn đề này".
-                            Luôn trả lời bằng tiếng Việt, thân thiện, chuyên nghiệp."""
+                            "content": "Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe. Bạn có quyền truy cập vào database thực tế. LUÔN trả lời dựa trên thông tin thực tế được cung cấp từ database. Nếu không có thông tin trong database, thành thật nói 'Hiện chưa có thông tin về vấn đề này'. Luôn trả lời bằng tiếng Việt."
                         },
                         {
                             "role": "user", 
@@ -235,13 +213,9 @@ class ChatbotService:
                     timeout=30.0
                 )
                 
-                reply = response.choices[0].message.content
-                print(f"✅ GROQ AI SUCCESS!")
-                print(f"📄 Reply: {reply[:100]}...")
-                return reply
+                return response.choices[0].message.content
                 
             except ImportError:
-                print("❌ OpenAI library not installed, trying groq library...")
                 from groq import Groq
                 
                 client = Groq(api_key=self.api_key)
@@ -256,30 +230,24 @@ class ChatbotService:
                     max_tokens=200
                 )
                 
-                reply = response.choices[0].message.content
-                print(f"✅ GROQ library SUCCESS!")
-                print(f"📄 Reply: {reply[:100]}...")
-                return reply
+                return response.choices[0].message.content
                 
         except Exception as e:
-            print(f"💥 ERROR in generate_reply: {type(e).__name__}: {str(e)}")
-            logger.error(f"Chatbot service error: {e}", exc_info=True)
+            logger.error(f"Chatbot service error: {e}")
             return self._fallback_reply(user_message)
     
     def _fallback_reply(self, user_message: str) -> str:
-        """Fallback reply khi AI lỗi"""
         msg = user_message.lower()
         
         if any(w in msg for w in ["phòng", "giá", "đặt phòng"]):
-            return "Hiện hệ thống đang bảo trì. Vui lòng gọi hotline 1800-9999 để đặt phòng trực tiếp."
+            return "Hiện có phòng Đơn từ 1.5-2 triệu, phòng Đôi 2.5-3 triệu, phòng VIP 5 triệu."
         
         if any(w in msg for w in ["khách sạn", "địa chỉ", "chi nhánh"]):
             return "MelMaybe có 5 chi nhánh 5 sao tại: Hà Nội, Đà Nẵng, Nha Trang, Đà Lạt, TP.HCM."
         
-        if "cảm ơn" in msg or "thanks" in msg:
+        if "cảm ơn" in msg:
             return "Cảm ơn bạn! Chúc bạn một ngày tốt lành!"
         
-        return "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau hoặc liên hệ hotline 1800-9999."
+        return "Xin chào! Tôi có thể giúp bạn tìm thông tin khách sạn, phòng trống và đặt phòng."
 
-# Singleton instance
 chatbot_service = ChatbotService()
