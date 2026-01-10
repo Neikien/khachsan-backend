@@ -1,50 +1,44 @@
 import os
-import random
 import logging
 
 logger = logging.getLogger(__name__)
 
-SUGGESTIONS = {
-    "destination": [
-        "Bạn có thể đến Đà Lạt, Sapa hoặc Phú Quốc — đều có resort rất đẹp.",
-        "Nếu bạn yêu thích biển, Nha Trang và Phú Quốc là lựa chọn tuyệt vời.",
-        "Hà Nội có nhiều khách sạn trung tâm tiện cho công tác và tham quan."
-    ],
-    "room": [
-        "Hiện chúng tôi có phòng đơn, phòng đôi và phòng suite cao cấp.",
-        "Phòng đôi đang giảm giá 15% trong tuần này.",
-        "Phòng suite hướng biển hiện còn trống, bạn có muốn xem chi tiết không?"
-    ],
-    "branch": [
-        "Hệ thống có chi nhánh tại Hà Nội, Đà Nẵng, TP.HCM và Phú Quốc.",
-        "Chi nhánh Đà Lạt nằm gần chợ đêm trung tâm.",
-        "Chi nhánh TP.HCM có dịch vụ đưa đón sân bay miễn phí."
-    ],
-    "support": [
-        "Bộ phận chăm sóc khách hàng hoạt động 24/7 qua hotline 1800 9999.",
-        "Bạn có thể gửi phản hồi qua website hoặc ứng dụng.",
-        "Xin vui lòng cho biết vấn đề bạn gặp phải, chúng tôi sẽ hỗ trợ ngay."
-    ]
-}
-
 def generate_reply(message: str) -> str:
     msg = message.lower()
 
-    if any(w in msg for w in ["groq", "ai", "trí tuệ nhân tạo", "artificial"]):
-        return "🤖 Tôi sử dụng Groq AI để trả lời các câu hỏi phức tạp về khách sạn!"
-
-    if any(w in msg for w in ["đi đâu", "địa điểm", "du lịch", "tham quan", "nên đi"]):
-        return random.choice(SUGGESTIONS["destination"])
-
-    if any(w in msg for w in ["phòng", "giá", "đặt", "còn trống", "bao nhiêu", "đơn", "đôi", "suite"]):
-        return random.choice(SUGGESTIONS["room"])
-
-    if any(w in msg for w in ["chi nhánh", "địa chỉ", "cơ sở", "ở đâu", "vị trí"]):
-        return random.choice(SUGGESTIONS["branch"])
-
-    if any(w in msg for w in ["hỗ trợ", "liên hệ", "phản hồi", "chăm sóc", "hotline"]):
-        return random.choice(SUGGESTIONS["support"])
-
+    # Giữ các rule đơn giản
+    if any(w in msg for w in ["hotline", "số điện thoại", "liên hệ"]):
+        return "📞 Hotline hỗ trợ 24/7: 1800-9999"
+    
+    if any(w in msg for w in ["cảm ơn", "thanks", "thank you"]):
+        return "Cảm ơn bạn! Chúc bạn một ngày tốt lành! 😊"
+    
+    if any(w in msg for w in ["xin chào", "hello", "hi", "chào"]):
+        return "Xin chào! Tôi là trợ lý ảo MelMaybe. Tôi có thể giúp gì cho bạn?"
+    
+    # Thông tin thực tế từ database
+    if any(w in msg for w in ["khách sạn", "hotel", "chi nhánh", "ở đâu"]):
+        return "🏨 **Hệ thống MelMaybe có 5 khách sạn 5 sao:**\n• Hà Nội: 1 Lê Thánh Tông, Hoàn Kiếm\n• Đà Nẵng: Bãi biển Mỹ Khê\n• Nha Trang: 2 Trần Phú\n• Đà Lạt: Đồi Cù, phường 1\n• TP.HCM: Bitexco Financial Tower, Quận 1"
+    
+    if any(w in msg for w in ["phòng đơn", "đơn", "single room"]):
+        return "🛏️ **Phòng Đơn:** 1.5 - 2 triệu VND/đêm"
+    
+    if any(w in msg for w in ["phòng đôi", "đôi", "double room"]):
+        return "🛏️ **Phòng Đôi:** 2.5 - 3 triệu VND/đêm"
+    
+    if any(w in msg for w in ["phòng vip", "vip", "suite"]):
+        return "🛏️ **Phòng VIP:** 5 triệu VND/đêm"
+    
+    if any(w in msg for w in ["phòng", "giá", "price", "bao nhiêu"]):
+        return "💰 **Bảng giá phòng:**\n• Phòng Đơn: 1.5 - 2 triệu\n• Phòng Đôi: 2.5 - 3 triệu\n• Phòng VIP: 5 triệu\n📞 Đặt phòng: 1800-9999"
+    
+    if any(w in msg for w in ["đặt phòng", "đặt", "book", "booking"]):
+        return "📋 **Để đặt phòng, vui lòng:**\n1. Chọn khách sạn trong 5 địa điểm trên\n2. Chọn loại phòng và ngày\n3. Gọi hotline 1800-9999\n4. Hoặc đến trực tiếp khách sạn"
+    
+    if any(w in msg for w in ["dịch vụ", "service", "tiện ích"]):
+        return "⭐ **Dịch vụ khách sạn:**\n• WiFi miễn phí\n• Bể bơi\n• Nhà hàng\n• Spa & massage\n• Trung tâm hội nghị\n• Đưa đón sân bay (một số chi nhánh)"
+    
+    # Nếu không match rule nào, dùng Groq AI
     return _safe_groq_reply(message)
 
 def _safe_groq_reply(user_message: str) -> str:
@@ -81,7 +75,7 @@ def _safe_groq_reply(user_message: str) -> str:
             messages=[
                 {
                     "role": "system", 
-                    "content": "Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe. Trả lời ngắn gọn bằng tiếng Việt."
+                    "content": "Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe (5 khách sạn 5 sao tại Hà Nội, Đà Nẵng, Nha Trang, Đà Lạt, TP.HCM). Giá phòng: Đơn 1.5-2tr, Đôi 2.5-3tr, VIP 5tr. Hotline: 1800-9999. Trả lời ngắn gọn bằng tiếng Việt."
                 },
                 {"role": "user", "content": user_message}
             ],
@@ -100,38 +94,19 @@ def _safe_groq_reply(user_message: str) -> str:
         print("="*60)
         logger.error(f"Groq API failed: {e}", exc_info=True)
         
-        # Try alternative method with groq library
-        try:
-            print("🔄 Trying alternative method with groq library...")
-            from groq import Groq
-            client = Groq(api_key=api_key)
-            
-            response = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": "Bạn là trợ lý khách sạn."},
-                    {"role": "user", "content": user_message}
-                ],
-                model="mixtral-8x7b-32768",
-                temperature=0.7,
-                max_tokens=100
-            )
-            
-            reply = response.choices[0].message.content
-            print(f"✅ SUCCESS with groq library! Reply: {reply[:80]}...")
-            return reply
-        except Exception as groq_error:
-            print(f"❌ Groq library also failed: {groq_error}")
-            
-            # Smart fallback based on message content
-            msg_lower = user_message.lower()
-            if "lịch sử" in msg_lower:
-                return "Khách sạn MelMaybe được thành lập năm 2010, hiện có 5 chi nhánh trên toàn quốc."
-            if "giá" in msg_lower or "bao nhiêu" in msg_lower:
-                return "Giá phòng từ 1.5 - 5 triệu/đêm tùy loại. Bạn muốn đặt phòng ở đâu?"
-            if "hà nội" in msg_lower:
-                return "Hà Nội có chi nhánh tại Hoàn Kiếm và Ba Đình với đầy đủ tiện nghi."
-            
-            return fallback_reply()
+        # Fallback thông minh
+        msg_lower = user_message.lower()
+        
+        if any(w in msg_lower for w in ["thời tiết", "weather"]):
+            return "Tôi là trợ lý khách sạn, không có thông tin thời tiết. Bạn có thể hỏi về khách sạn, phòng, giá cả hoặc dịch vụ."
+        
+        if any(w in msg_lower for w in ["ăn", "uống", "nhà hàng", "food"]):
+            return "Mỗi khách sạn MelMaybe đều có nhà hàng phục vụ ẩm thực Việt Nam và quốc tế. Giờ mở cửa: 6:00 - 22:00."
+        
+        if any(w in msg_lower for w in ["wifi", "internet"]):
+            return "Tất cả khách sạn MelMaybe đều có WiFi miễn phí tốc độ cao trong toàn bộ khuôn viên."
+        
+        return fallback_reply()
 
 def generate_groq_reply(user_message: str) -> str:
     return _safe_groq_reply(user_message)
@@ -139,6 +114,10 @@ def generate_groq_reply(user_message: str) -> str:
 def fallback_reply() -> str:
     return (
         "Xin chào! Tôi là trợ lý ảo của hệ thống khách sạn MelMaybe. "
-        "Tôi có thể hỗ trợ bạn về: đặt phòng, thông tin chi nhánh, dịch vụ khách sạn. "
+        "Tôi có thể giúp bạn:\n"
+        "• Tìm thông tin 5 khách sạn 5 sao\n"
+        "• Tư vấn giá phòng (Đơn 1.5-2tr, Đôi 2.5-3tr, VIP 5tr)\n"
+        "• Hỗ trợ đặt phòng\n"
+        "• Cung cấp hotline: 1800-9999\n"
         "Bạn muốn hỏi gì ạ?"
     )
