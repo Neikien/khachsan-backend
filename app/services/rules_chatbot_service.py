@@ -79,8 +79,7 @@ def _safe_groq_reply(user_message: str) -> str:
 === QUY TẮC TRẢ LỜI ===
 1. CHỈ dùng thông tin trên, KHÔNG bịa ra
 2. Không biết → "Hiện chưa có thông tin về..."
-3. Luôn đề cập MÃ KHÁCH SẠN (MaKS) khi nói cụ thể
-4. Nhắc hotline 1800-9999 để đặt phòng/dịch vụ
+4. Nhắc hotline 3636-2929 để đặt phòng/dịch vụ
 5. Trả lời bằng tiếng Việt, ngắn gọn, thân thiện
 6. Với dịch vụ: nêu giá và thời gian phục vụ
 7. Với liên hệ: cung cấp số quản lý tương ứng"""
