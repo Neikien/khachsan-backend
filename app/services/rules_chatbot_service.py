@@ -120,13 +120,13 @@ def _safe_groq_reply(user_message: str) -> str:
             return "Tôi là trợ lý khách sạn. Bạn có thể hỏi về khách sạn, phòng, giá cả, dịch vụ hoặc hotline 1800-9999."
         
         if any(w in msg_lower for w in ["ăn", "uống", "nhà hàng", "food", "đồ ăn"]):
-            return "Mỗi MelMaybe đều có: Buffet sáng (250k, 6-10h), Nhà hàng (500k, 10-22h), Quầy bar (150k, 16-23h)."
+            return "Mỗi InterContinental đều có: Buffet sáng (250k, 6-10h), Nhà hàng (500k, 10-22h), Quầy bar (150k, 16-23h)."
         
         if any(w in msg_lower for w in ["wifi", "internet", "mạng"]):
-            return "Tất cả MelMaybe đều có WiFi miễn phí tốc độ cao."
+            return "Tất cả InterContinental đều có WiFi miễn phí tốc độ cao."
         
         if any(w in msg_lower for w in ["spa", "massage", "thư giãn"]):
-            return "Dịch vụ spa tại MelMaybe: 600,000 VND cho 60 phút massage."
+            return "Dịch vụ spa tại InterContinental: 600,000 VND cho 60 phút massage."
         
         return fallback_reply()
 
@@ -134,7 +134,7 @@ def generate_groq_reply(user_message: str) -> str:
     return _safe_groq_reply(user_message)
 
 def fallback_reply() -> str:
-    return """🏨 **Xin chào! Tôi là trợ lý ảo MelMaybe.**
+    return """🏨 **Xin chào! Tôi là trợ lý ảo InterContinental.**
 
 Tôi có thể giúp bạn:
 • Tìm 6 khách sạn 5 sao (Hà Nội, Đà Nẵng, Nha Trang, Đà Lạt, TP.HCM, Thanh Hóa)
