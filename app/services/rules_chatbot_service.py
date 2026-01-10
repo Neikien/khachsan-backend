@@ -49,7 +49,7 @@ def generate_reply(message: str) -> str:
 
 def _safe_groq_reply(user_message: str) -> str:
     print("\n" + "="*60)
-    print("🚀 GROQ API CALL START")
+    print("🚀 GROQ API via OpenAI Library")
     
     api_key = os.getenv("apikey") or os.getenv("GROQ_API_KEY")
     
@@ -59,7 +59,7 @@ def _safe_groq_reply(user_message: str) -> str:
         return fallback_reply()
     
     base_url = os.getenv("GROQ_API_BASE", "https://api.groq.com/openai/v1")
-    model = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+    model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     
     print(f"✅ API Key: Found ({len(api_key)} chars)")
     print(f"📡 Base URL: {base_url}")
@@ -67,16 +67,17 @@ def _safe_groq_reply(user_message: str) -> str:
     print(f"📝 Message: {user_message[:50]}...")
     
     try:
-        from groq import Groq
+        from openai import OpenAI
         
-        print("🔧 Creating Groq client...")
-        client = Groq(
+        print("🔧 Creating OpenAI client for Groq...")
+        client = OpenAI(
             api_key=api_key,
             base_url=base_url
         )
         
         print("📤 Sending request to Groq API...")
         response = client.chat.completions.create(
+            model=model,
             messages=[
                 {
                     "role": "system", 
@@ -84,10 +85,9 @@ def _safe_groq_reply(user_message: str) -> str:
                 },
                 {"role": "user", "content": user_message}
             ],
-            model=model,
             temperature=0.7,
-            max_tokens=100,
-            timeout=15.0
+            max_tokens=150,
+            timeout=20.0
         )
         
         reply = response.choices[0].message.content
@@ -100,15 +100,38 @@ def _safe_groq_reply(user_message: str) -> str:
         print("="*60)
         logger.error(f"Groq API failed: {e}", exc_info=True)
         
-        msg_lower = user_message.lower()
-        if "lịch sử" in msg_lower:
-            return "Khách sạn MelMaybe được thành lập năm 2010, hiện có 5 chi nhánh trên toàn quốc."
-        if "giá" in msg_lower or "bao nhiêu" in msg_lower:
-            return "Giá phòng từ 1.5 - 5 triệu/đêm tùy loại. Bạn muốn đặt phòng ở đâu?"
-        if "hà nội" in msg_lower:
-            return "Hà Nội có chi nhánh tại Hoàn Kiếm và Ba Đình với đầy đủ tiện nghi."
-        
-        return fallback_reply()
+        # Try alternative method with groq library
+        try:
+            print("🔄 Trying alternative method with groq library...")
+            from groq import Groq
+            client = Groq(api_key=api_key)
+            
+            response = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "Bạn là trợ lý khách sạn."},
+                    {"role": "user", "content": user_message}
+                ],
+                model="mixtral-8x7b-32768",
+                temperature=0.7,
+                max_tokens=100
+            )
+            
+            reply = response.choices[0].message.content
+            print(f"✅ SUCCESS with groq library! Reply: {reply[:80]}...")
+            return reply
+        except Exception as groq_error:
+            print(f"❌ Groq library also failed: {groq_error}")
+            
+            # Smart fallback based on message content
+            msg_lower = user_message.lower()
+            if "lịch sử" in msg_lower:
+                return "Khách sạn MelMaybe được thành lập năm 2010, hiện có 5 chi nhánh trên toàn quốc."
+            if "giá" in msg_lower or "bao nhiêu" in msg_lower:
+                return "Giá phòng từ 1.5 - 5 triệu/đêm tùy loại. Bạn muốn đặt phòng ở đâu?"
+            if "hà nội" in msg_lower:
+                return "Hà Nội có chi nhánh tại Hoàn Kiếm và Ba Đình với đầy đủ tiện nghi."
+            
+            return fallback_reply()
 
 def generate_groq_reply(user_message: str) -> str:
     return _safe_groq_reply(user_message)
