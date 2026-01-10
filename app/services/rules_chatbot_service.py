@@ -28,10 +28,8 @@ SUGGESTIONS = {
 }
 
 def generate_reply(message: str) -> str:
-    """Generate reply with fallback to avoid recursion"""
     msg = message.lower()
 
-    # Check for groq/AI questions first
     if any(w in msg for w in ["groq", "ai", "trí tuệ nhân tạo", "artificial"]):
         return "🤖 Tôi sử dụng Groq AI để trả lời các câu hỏi phức tạp về khách sạn!"
 
@@ -47,122 +45,75 @@ def generate_reply(message: str) -> str:
     if any(w in msg for w in ["hỗ trợ", "liên hệ", "phản hồi", "chăm sóc", "hotline"]):
         return random.choice(SUGGESTIONS["support"])
 
-    # If not match rule, try Groq AI but avoid recursion
-    try:
-        return _safe_groq_reply(message)
-    except Exception as e:
-        logger.error(f"All reply methods failed: {e}")
-        return fallback_reply()
+    return _safe_groq_reply(message)
 
 def _safe_groq_reply(user_message: str) -> str:
-    """Safe Groq API call without recursion"""
-    api_key = os.getenv("apikey")
+    print("\n" + "="*60)
+    print("🚀 GROQ API CALL START")
+    
+    api_key = os.getenv("apikey") or os.getenv("GROQ_API_KEY")
     
     if not api_key:
-        logger.warning("API key not found in environment")
+        print("❌ ERROR: No API key found")
+        print("="*60)
         return fallback_reply()
     
+    base_url = os.getenv("GROQ_API_BASE", "https://api.groq.com/openai/v1")
+    model = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+    
+    print(f"✅ API Key: Found ({len(api_key)} chars)")
+    print(f"📡 Base URL: {base_url}")
+    print(f"🤖 Model: {model}")
+    print(f"📝 Message: {user_message[:50]}...")
+    
     try:
-        logger.info(f"Attempting Groq API for: {user_message[:50]}")
-        
-        # FIX 1: Đơn giản hóa - không dùng requests session phức tạp
         from groq import Groq
         
-        # FIX 2: Try-catch đơn giản để xử lý proxies error
-        try:
-            # Thử cách đơn giản nhất trước
-            client = Groq(api_key=api_key)
-            logger.info("Groq client created successfully (simple method)")
-        except TypeError as e:
-            if 'proxies' in str(e):
-                logger.warning("Proxies error detected, trying workaround...")
-                # CÁCH FIX PROXIES: Dùng environment variable override
-                import os
-                # Lưu lại environment cũ
-                old_env = dict(os.environ)
-                
-                # Xóa tất cả proxy related environment variables
-                proxy_keys = ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY']
-                for key in proxy_keys:
-                    if key in os.environ:
-                        logger.info(f"Removing {key} from environment")
-                        del os.environ[key]
-                
-                # Thử lại sau khi xóa proxy env
-                client = Groq(api_key=api_key)
-                logger.info("Groq client created after removing proxy env")
-                
-                # Khôi phục environment
-                os.environ.clear()
-                os.environ.update(old_env)
-            else:
-                raise e
+        print("🔧 Creating Groq client...")
+        client = Groq(
+            api_key=api_key,
+            base_url=base_url
+        )
         
-        # FIX 3: Thử models đơn giản hơn
-        system_prompt = """Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe.
-        Trả lời ngắn gọn, thân thiện, tập trung vào dịch vụ khách sạn.
-        Luôn trả lời bằng tiếng Việt.
+        print("📤 Sending request to Groq API...")
+        response = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system", 
+                    "content": "Bạn là trợ lý ảo của hệ thống khách sạn MelMaybe. Trả lời ngắn gọn bằng tiếng Việt."
+                },
+                {"role": "user", "content": user_message}
+            ],
+            model=model,
+            temperature=0.7,
+            max_tokens=100,
+            timeout=15.0
+        )
         
-        Ví dụ về khách sạn ở Hà Nội: Khách sạn Melia, Sofitel Legend Metropole, InterContinental, Hilton."""
-        
-        try:
-            # Thử model phổ biến nhất trước
-            logger.info("Trying model: mixtral-8x7b-32768")
-            response = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                model="mixtral-8x7b-32768",
-                temperature=0.7,
-                max_tokens=150,
-                timeout=10  # Thêm timeout
-            )
-            
-            reply = response.choices[0].message.content
-            logger.info(f"Groq API success: {reply[:80]}...")
-            return reply
-            
-        except Exception as model_error:
-            logger.warning(f"Model mixtral failed: {model_error}, trying llama...")
-            # Thử model khác
-            try:
-                response = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_message}
-                    ],
-                    model="llama3-70b-8192",
-                    temperature=0.7,
-                    max_tokens=150,
-                    timeout=10
-                )
-                reply = response.choices[0].message.content
-                logger.info(f"Groq API success with llama: {reply[:80]}...")
-                return reply
-            except Exception:
-                # Fallback: tự tạo reply đơn giản
-                if "hà nội" in user_message.lower() or "hanoi" in user_message.lower():
-                    return "Hà Nội có nhiều khách sạn tuyệt vời như: Melia Hanoi, Sofitel Legend Metropole, InterContinental Hanoi, Hilton Hanoi Opera. Bạn muốn đặt phòng khách sạn nào ạ?"
-                return fallback_reply()
-        
-    except ImportError as e:
-        logger.error(f"Groq import error: {e}")
-        return "⚠️ Hệ thống AI đang được cập nhật. Bạn có thể hỏi về đặt phòng, giá cả, dịch vụ khách sạn."
+        reply = response.choices[0].message.content
+        print(f"✅ SUCCESS! Reply: {reply[:80]}...")
+        print("="*60)
+        return reply
         
     except Exception as e:
-        logger.error(f"Groq API error: {type(e).__name__}: {str(e)[:100]}")
-        # FIX: Trả về reply có ý nghĩa hơn
-        if "hà nội" in user_message.lower():
-            return "Tại Hà Nội, hệ thống khách sạn MelMaybe có chi nhánh tại quận Hoàn Kiếm và Ba Đình với đầy đủ tiện nghi. Bạn muốn đặt phòng loại nào ạ?"
-        return "Hiện tôi có thể hỗ trợ bạn đặt phòng, tư vấn điểm đến, hoặc giới thiệu dịch vụ khách sạn. Bạn cần hỗ trợ gì ạ?"
+        print(f"💥 ERROR: {type(e).__name__}: {str(e)}")
+        print("="*60)
+        logger.error(f"Groq API failed: {e}", exc_info=True)
+        
+        msg_lower = user_message.lower()
+        if "lịch sử" in msg_lower:
+            return "Khách sạn MelMaybe được thành lập năm 2010, hiện có 5 chi nhánh trên toàn quốc."
+        if "giá" in msg_lower or "bao nhiêu" in msg_lower:
+            return "Giá phòng từ 1.5 - 5 triệu/đêm tùy loại. Bạn muốn đặt phòng ở đâu?"
+        if "hà nội" in msg_lower:
+            return "Hà Nội có chi nhánh tại Hoàn Kiếm và Ba Đình với đầy đủ tiện nghi."
+        
+        return fallback_reply()
 
 def generate_groq_reply(user_message: str) -> str:
-    """Public wrapper for Groq reply"""
     return _safe_groq_reply(user_message)
 
 def fallback_reply() -> str:
-    """Simple fallback without calling other reply functions"""
     return (
         "Xin chào! Tôi là trợ lý ảo của hệ thống khách sạn MelMaybe. "
         "Tôi có thể hỗ trợ bạn về: đặt phòng, thông tin chi nhánh, dịch vụ khách sạn. "
