@@ -18,7 +18,7 @@ def generate_reply(message: str) -> str:
     
     # Basic info from database (fallback khi AI không hoạt động)
     if any(w in msg for w in ["khách sạn", "hotel", "chi nhánh", "ở đâu"]):
-        return "🏨 **Hệ thống MelMaybe có 6 khách sạn 5 sao:**\n• Hà Nội (MaKS: 291): 1 Lê Thánh Tông\n• Đà Nẵng (432): Bãi biển Mỹ Khê\n• Nha Trang (493): 2 Trần Phú\n• Đà Lạt (684): Đồi Cù\n• TP.HCM (795): Bitexco Tower Q1\n• Thanh Hóa (366): Bãi biển Sầm Sơn"
+        return "🏨 **Hệ thống InterContinental có 6 khách sạn 5 sao:**\n• Hà Nội : 1 Lê Thánh Tông\n• Đà Nẵng : Bãi biển Mỹ Khê\n• Nha Trang : 2 Trần Phú\n• Đà Lạt : Đồi Cù\n• TP.HCM : Bitexco Tower Q1\n• Thanh Hóa : Bãi biển Sầm Sơn"
     
     if any(w in msg for w in ["phòng đơn", "đơn"]):
         return "🛏️ **Phòng Đơn:** 1.3 - 2 triệu VND/đêm (tùy địa điểm)"
@@ -49,12 +49,12 @@ def _safe_groq_reply(user_message: str) -> str:
     system_prompt = """BẠN LÀ TRỢ LÝ ẢO MELMAYBE - HỆ THỐNG 6 KHÁCH SẠN 5 SAO:
 
 === KHÁCH SẠN (MÃ KHÁCH SẠN - MaKS) ===
-1. HÀ NỘI (291): 1 Lê Thánh Tông, Hoàn Kiếm - Quản lý: Nguyễn Văn Toàn (0909123456)
-2. ĐÀ NẴNG (432): Bãi biển Mỹ Khê - Quản lý: Trần Thị Hương (0918234567)
-3. NHA TRANG (493): 2 Trần Phú - Quản lý: Lê Minh Tuấn (0927345678) - Biết tiếng Anh/Nhật
-4. ĐÀ LẠT (684): Đồi Cù - Quản lý: Phạm Thị Lan (0936456789) - Chuyên honeymoon
-5. TP.HCM (795): Bitexco Tower Q1 - Quản lý: Hoàng Văn Đức (0945567890)
-6. THANH HÓA (366): Bãi biển Sầm Sơn
+1. InterContinental HÀ NỘI (291): 1 Lê Thánh Tông, Hoàn Kiếm - Quản lý: Nguyễn Văn Toàn (0909123456)
+2. InterContinental ĐÀ NẴNG (432): Bãi biển Mỹ Khê - Quản lý: Trần Thị Hương (0918234567)
+3. InterContinental NHA TRANG (493): 2 Trần Phú - Quản lý: Lê Minh Tuấn (0927345678) - Biết tiếng Anh/Nhật
+4. InterContinental ĐÀ LẠT (684): Đồi Cù - Quản lý: Phạm Thị Lan (0936456789) - Chuyên honeymoon
+5. InterContinental TP.HCM (795): Bitexco Tower Q1 - Quản lý: Hoàng Văn Đức (0945567890)
+6. InterContinental THANH HÓA (366): Bãi biển Sầm Sơn
 
 === GIÁ PHÒNG (VND/đêm) ===
 • HÀ NỘI: Đơn 1.8tr, Đôi 3tr, VIP 6tr
