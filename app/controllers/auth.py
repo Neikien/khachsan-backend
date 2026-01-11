@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Response, Request, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 from botocore.client import BaseClient
 from app.schemas.auth import SignupRequest, UserResponse, UserUpdate
 from app.core.config import config
@@ -21,16 +21,22 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
+    # QUAN TRỌNG: Sửa dòng này - tìm user bằng username HOẶC email
     result = await db.execute(
-        select(User).where(User.username == form_data.username)
+        select(User).where(
+            or_(
+                User.username == form_data.username,  # Username cũ
+                User.email == form_data.username      # Email mới
+            )
+        )
     )
     user = result.scalar_one_or_none()
 
     if user is None:
-        raise HTTPException(status_code=400, detail="Invalid username or password")
+        raise HTTPException(status_code=400, detail="Invalid username/email or password")
 
     if not verify_password(form_data.password, user.password):
-        raise HTTPException(status_code=400, detail="Invalid username or password")
+        raise HTTPException(status_code=400, detail="Invalid username/email or password")
 
     access_token = create_token({'sub': user.id})
     refresh_token = create_token({'sub': user.id}, typ='refresh')
@@ -44,6 +50,7 @@ async def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+# Phần còn lại giữ nguyên...
 @router.post('/signup')
 async def signup(form_data: SignupRequest, db: AsyncSession = Depends(get_db)):
     logger.info(f"Signup attempt: {form_data.username}, {form_data.email}")
