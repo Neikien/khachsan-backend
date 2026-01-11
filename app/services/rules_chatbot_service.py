@@ -1,9 +1,11 @@
 import os
 import logging
+from openai import OpenAI  # Import ở cấp module
 
 logger = logging.getLogger(__name__)
 
 def _safe_groq_reply(user_message: str) -> str:
+    """Xử lý câu trả lời từ Groq AI với fallback an toàn"""
     print("\n" + "="*60)
     print("🚀 GROQ AI WITH FULL DATABASE KNOWLEDGE")
     
@@ -12,39 +14,6 @@ def _safe_groq_reply(user_message: str) -> str:
     if not api_key:
         print("❌ No API key, using fallback")
         return fallback_reply()
-def generate_reply(message: str) -> str:
-    msg = message.lower()
-
-    # Quick responses
-    if any(w in msg for w in ["hotline", "số điện thoại", "liên hệ"]):
-        return "📞 Hotline đặt phòng 24/7: 1800-9999"
-    
-    if any(w in msg for w in ["cảm ơn", "thanks", "thank you"]):
-        return "Cảm ơn bạn! Chúc bạn một ngày tốt lành! 😊"
-    
-    if any(w in msg for w in ["xin chào", "hello", "hi", "chào"]):
-        return "Xin chào! Tôi là trợ lý ảo MelMaybe. Tôi có thể giúp gì cho bạn?"
-    
-    # Basic info from database (fallback khi AI không hoạt động)
-    if any(w in msg for w in ["khách sạn", "hotel", "chi nhánh", "ở đâu"]):
-        return "🏨 **Hệ thống InterContinental có 6 khách sạn 5 sao:**\n• Hà Nội : 1 Lê Thánh Tông\n• Đà Nẵng : Bãi biển Mỹ Khê\n• Nha Trang : 2 Trần Phú\n• Đà Lạt : Đồi Cù\n• TP.HCM : Bitexco Tower Q1\n• Thanh Hóa : Bãi biển Sầm Sơn"
-    
-    if any(w in msg for w in ["phòng đơn", "đơn"]):
-        return "🛏️ **Phòng Đơn:** 1.3 - 2 triệu VND/đêm (tùy địa điểm)"
-    
-    if any(w in msg for w in ["phòng đôi", "đôi"]):
-        return "🛏️ **Phòng Đôi:** 2.2 - 3.6 triệu VND/đêm"
-    
-    if any(w in msg for w in ["phòng vip", "vip"]):
-        return "🛏️ **Phòng VIP:** 4.5 - 7 triệu VND/đêm"
-    
-    if any(w in msg for w in ["giá", "price", "bao nhiêu"]):
-        return "💰 **Giá tham khảo:**\n• Đơn: 1.3-2tr\n• Đôi: 2.2-3.6tr\n• VIP: 4.5-7tr\n📞 Chi tiết: 1800-9999"
-    
-    # Dùng AI cho các câu hỏi phức tạp
-    return _safe_groq_reply(message)
-
-
     
     # OPTIMIZED SYSTEM PROMPT với toàn bộ database
     system_prompt = """BẠN LÀ TRỢ LÝ ẢO MELMAYBE - HỆ THỐNG 6 KHÁCH SẠN 5 SAO:
@@ -55,7 +24,7 @@ def generate_reply(message: str) -> str:
 3. InterContinental NHA TRANG (493): 2 Trần Phú - Quản lý: Lê Minh Tuấn (0927345678) - Biết tiếng Anh/Nhật
 4. InterContinental ĐÀ LẠT (684): Đồi Cù - Quản lý: Phạm Thị Lan (0936456789) - Chuyên honeymoon
 5. InterContinental TP.HCM (795): Bitexco Tower Q1 - Quản lý: Hoàng Văn Đức (0945567890)
-6. InterContinental THANH HÓA (366): Bãi biển Sầm Sơn - Quản lý Nguyễn Thị Mai(0912345678')
+6. InterContinental THANH HÓA (366): Bãi biển Sầm Sơn - Quản lý: Nguyễn Thị Mai(0912345678')
 
 === GIÁ PHÒNG (VND/đêm) ===
 • HÀ NỘI: Đơn 1.8tr, Đôi 3tr, VIP 6tr
@@ -81,16 +50,14 @@ def generate_reply(message: str) -> str:
 1. CHỈ dùng thông tin trên, KHÔNG bịa ra
 2. Không biết → "Hiện chưa có thông tin về...", có thể trả lời khéo léo một chút, ko quá máy móc
 3. Có thể gợi ý khách hàng về các địa điểm mà ta có khách sạn một cách đơn giản.
-4. Nhắc hotline 3636-2929 để đặt phòng/dịch vụ
+4. Nhắc hotline 1800-9999 để đặt phòng/dịch vụ
 5. Trả lời bằng tiếng Việt, ngắn gọn, thân thiện
 6. Với dịch vụ: nêu giá và thời gian phục vụ
 7. Với liên hệ: cung cấp số quản lý tương ứng, nhắc đến quản lý là phải đi kèm với số điện thoại
 8. Không nhắc đến giá và mã khách sạn trừ khi khách hỏi
 9. Khi nhận được câu hỏi, hãy xem thật kĩ xem thông tin có thể liên quan đến khu vực được hỏi hay không, xem xét kĩ r mới nhận định thông tin có liên quan đến mong muốn du lịch không"""
-
+    
     try:
-        from openai import OpenAI
-        
         print("🤖 Sending to Groq AI...")
         client = OpenAI(
             api_key=api_key,
@@ -134,7 +101,40 @@ def generate_reply(message: str) -> str:
         
         return fallback_reply()
 
+def generate_reply(message: str) -> str:
+    msg = message.lower()
+
+    # Quick responses
+    if any(w in msg for w in ["hotline", "số điện thoại", "liên hệ"]):
+        return "📞 Hotline đặt phòng 24/7: 1800-9999"
+    
+    if any(w in msg for w in ["cảm ơn", "thanks", "thank you"]):
+        return "Cảm ơn bạn! Chúc bạn một ngày tốt lành! 😊"
+    
+    if any(w in msg for w in ["xin chào", "hello", "hi", "chào"]):
+        return "Xin chào! Tôi là trợ lý ảo MelMaybe. Tôi có thể giúp gì cho bạn?"
+    
+    # Basic info from database (fallback khi AI không hoạt động)
+    if any(w in msg for w in ["khách sạn", "hotel", "chi nhánh", "ở đâu"]):
+        return "🏨 **Hệ thống InterContinental có 6 khách sạn 5 sao:**\n• Hà Nội : 1 Lê Thánh Tông\n• Đà Nẵng : Bãi biển Mỹ Khê\n• Nha Trang : 2 Trần Phú\n• Đà Lạt : Đồi Cù\n• TP.HCM : Bitexco Tower Q1\n• Thanh Hóa : Bãi biển Sầm Sơn"
+    
+    if any(w in msg for w in ["phòng đơn", "đơn"]):
+        return "🛏️ **Phòng Đơn:** 1.3 - 2 triệu VND/đêm (tùy địa điểm)"
+    
+    if any(w in msg for w in ["phòng đôi", "đôi"]):
+        return "🛏️ **Phòng Đôi:** 2.2 - 3.6 triệu VND/đêm"
+    
+    if any(w in msg for w in ["phòng vip", "vip"]):
+        return "🛏️ **Phòng VIP:** 4.5 - 7 triệu VND/đêm"
+    
+    if any(w in msg for w in ["giá", "price", "bao nhiêu"]):
+        return "💰 **Giá tham khảo:**\n• Đơn: 1.3-2tr\n• Đôi: 2.2-3.6tr\n• VIP: 4.5-7tr\n📞 Chi tiết: 1800-9999"
+    
+    # Dùng AI cho các câu hỏi phức tạp
+    return _safe_groq_reply(message)
+
 def generate_groq_reply(user_message: str) -> str:
+    """Wrapper function cho compatibility"""
     return _safe_groq_reply(user_message)
 
 def fallback_reply() -> str:
