@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, or_
 from botocore.client import BaseClient
 import re
+import unicodedata
 from email_validator import validate_email, EmailNotValidError
 from app.schemas.auth import SignupRequest, UserResponse, UserUpdate
 from app.core.config import config
@@ -83,6 +84,13 @@ async def signup(form_data: SignupRequest, db: AsyncSession = Depends(get_db)):
     
     if ' ' in form_data.username:
         errors['username'] = "Username không được chứa khoảng trắng"
+    
+    if any(ord(char) > 127 for char in form_data.email):
+        errors['email_accents'] = "Email không được chứa ký tự có dấu (ví dụ: é, è, â, ố)"
+    
+    email_local_part = form_data.email.split('@')[0]
+    if not re.match(r'^[a-zA-Z0-9._-]+$', email_local_part):
+        errors['email_invalid_chars'] = "Email chỉ được chứa chữ cái, số, dấu chấm, gạch dưới và gạch ngang"
     
     if errors:
         raise HTTPException(status_code=400, detail=errors)
@@ -213,6 +221,9 @@ async def update_user(
             validate_email(request.email)
         except EmailNotValidError:
             errors['email'] = "Email không hợp lệ"
+        
+        if any(ord(char) > 127 for char in request.email):
+            errors['email_accents'] = "Email không được chứa ký tự có dấu"
         
         email_result = await db.execute(select(User).where(User.email == request.email))
         existing_email = email_result.scalar_one_or_none()
