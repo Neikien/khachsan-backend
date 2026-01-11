@@ -5,6 +5,8 @@ from sqlalchemy import text
 import os
 import uvicorn
 import logging
+import json
+from decimal import Decimal
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,12 +29,33 @@ from app.controllers.service_usage_controller import router as service_usage_rou
 from app.core.database import engine, Base
 from app.models import user, area, hotel, room, customer, booking, service, review, activity_log, service_usage
 
+# Custom JSON Encoder cho Decimal
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)  # Convert Decimal → float
+        return super().default(obj)
+
+# Custom JSONResponse với Decimal encoder
+class DecimalJSONResponse(JSONResponse):
+    media_type = "application/json"
+    
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            cls=DecimalEncoder,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":")
+        ).encode("utf-8")
+
 app = FastAPI(
     title="Hotel Management API",
     description="Hệ thống quản lý khách sạn",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    default_response_class=DecimalJSONResponse  # Sử dụng custom response
 )
 
 origins = ["*"]
