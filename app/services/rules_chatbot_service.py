@@ -1,9 +1,35 @@
 import os
 import logging
+from typing import Dict, List
+from collections import defaultdict
 from openai import OpenAI  # Import ở cấp module
 
 logger = logging.getLogger(__name__)
 
+# ========== BỘ NHỚ HỘI THOẠI ==========
+# Lưu trữ lịch sử hội thoại cho từng user
+_conversation_history: Dict[str, List[Dict]] = defaultdict(list)
+_MAX_HISTORY_LENGTH = 6  # Chỉ nhớ 6 tin nhắn gần nhất (3 cặp Q-A)
+
+def _get_user_history(user_id: str = "default") -> List[Dict]:
+    """Lấy lịch sử hội thoại của user"""
+    return _conversation_history.get(user_id, [])
+
+def _add_to_history(user_id: str = "default", role: str = "user", content: str = ""):
+    """Thêm tin nhắn vào lịch sử"""
+    history = _conversation_history[user_id]
+    history.append({"role": role, "content": content})
+    
+    # Giới hạn độ dài lịch sử
+    if len(history) > _MAX_HISTORY_LENGTH:
+        _conversation_history[user_id] = history[-_MAX_HISTORY_LENGTH:]
+
+def _clear_history(user_id: str = "default"):
+    """Xóa lịch sử hội thoại"""
+    if user_id in _conversation_history:
+        del _conversation_history[user_id]
+
+# ========== HÀM CŨ ĐƯỢC GIỮ NGUYÊN ==========
 def _safe_groq_reply(user_message: str) -> str:
     """Xử lý câu trả lời từ Groq AI với fallback an toàn"""
     print("\n" + "="*60)
@@ -101,37 +127,165 @@ def _safe_groq_reply(user_message: str) -> str:
         
         return fallback_reply()
 
-def generate_reply(message: str) -> str:
-    msg = message.lower()
+# ========== HÀM MỚI CÓ MEMORY ==========
+def _safe_groq_reply_with_context(user_message: str, user_id: str = "default") -> str:
+    """Phiên bản AI có nhớ context hội thoại"""
+    print("\n" + "="*60)
+    print("🧠 AI WITH CONVERSATION MEMORY")
+    
+    api_key = os.getenv("apikey") or os.getenv("GROQ_API_KEY")
+    
+    if not api_key:
+        print("❌ No API key, using fallback")
+        return fallback_reply()
+    
+    # Lấy lịch sử hội thoại
+    history = _get_user_history(user_id)
+    
+    # Tạo system prompt với hướng dẫn về memory
+    system_prompt = """BẠN LÀ TRỢ LÝ ẢO MELMAYBE - HỆ THỐNG 6 KHÁCH SẠN 5 SAO:
 
-    # Quick responses
-    if any(w in msg for w in ["hotline", "số điện thoại", "liên hệ"]):
-        return "📞 Hotline đặt phòng 24/7: 1800-9999"
+=== THÔNG TIN CHÍNH ===
+KHÁCH SẠN:
+1. InterContinental HÀ NỘI (291): 1 Lê Thánh Tông, Hoàn Kiếm - Quản lý: Nguyễn Văn Toàn (0909123456)
+2. InterContinental ĐÀ NẴNG (432): Bãi biển Mỹ Khê - Quản lý: Trần Thị Hương (0918234567)
+3. InterContinental NHA TRANG (493): 2 Trần Phú - Quản lý: Lê Minh Tuấn (0927345678) - Biết tiếng Anh/Nhật
+4. InterContinental ĐÀ LẠT (684): Đồi Cù - Quản lý: Phạm Thị Lan (0936456789) - Chuyên honeymoon
+5. InterContinental TP.HCM (795): Bitexco Tower Q1 - Quản lý: Hoàng Văn Đức (0945567890)
+6. InterContinental THANH HÓA (366): Bãi biển Sầm Sơn - Quản lý: Nguyễn Thị Mai(0912345678')
+
+GIÁ PHÒNG (VND/đêm):
+• HÀ NỘI: Đơn 1.8tr, Đôi 3tr, VIP 6tr
+• ĐÀ NẴNG: Đơn 1.5tr, Đôi 2.5tr, VIP 5tr
+• NHA TRANG: Đơn 1.6tr, Đôi 2.8tr, VIP 5.5tr
+• ĐÀ LẠT: Đơn 1.3tr, Đôi 2.2tr, VIP 4.5tr
+• TP.HCM: Đơn 2tr, Đôi 3.5tr, VIP 7tr
+• THANH HÓA: Đơn 1.8tr, Đôi 3.6tr, VIP 7tr
+
+HOTLINE: 1800-9999
+
+=== QUY TẮC QUAN TRỌNG ===
+1. LUÔN NHỚ cuộc hội thoại trước đó. Nếu user hỏi tiếp về chủ đề cũ, hãy trả lời có liên kết.
+2. CHỈ dùng thông tin trên, KHÔNG bịa ra
+3. Trả lời bằng tiếng Việt, ngắn gọn, thân thiện
+4. Nhắc hotline 1800-9999 khi cần đặt phòng/dịch vụ
+5. Với câu hỏi tiếp theo: Hiểu ngữ cảnh và trả lời phù hợp
+
+Ví dụ: 
+- Nếu user trước hỏi về Hà Nội, sau hỏi "Giá bao nhiêu?" → Hiểu là hỏi giá Hà Nội
+- Nếu user hỏi "Có phòng không?" sau khi đã nói về địa điểm → Hiểu là phòng ở địa điểm đó"""
     
+    try:
+        print("🤖 Sending to Groq AI with context...")
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.groq.com/openai/v1"
+        )
+        
+        # Tạo messages: system prompt + history + current question
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Thêm lịch sử hội thoại
+        messages.extend(history)
+        
+        # Thêm câu hỏi hiện tại
+        messages.append({"role": "user", "content": user_message})
+        
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=250,
+            timeout=20.0
+        )
+        
+        reply = response.choices[0].message.content
+        print(f"✅ AI WITH MEMORY SUCCESS! Reply: {reply[:100]}...")
+        print("="*60)
+        return reply
+        
+    except Exception as e:
+        print(f"💥 AI Error: {type(e).__name__}: {str(e)}")
+        logger.error(f"Groq API with context failed: {e}")
+        # Fallback về phiên bản không có memory
+        return _safe_groq_reply(user_message)
+
+# ========== HÀM CHÍNH MỚI CÓ MEMORY ==========
+def generate_reply_with_memory(message: str, user_id: str = "default") -> str:
+    """Phiên bản mới có memory - SỬA LỖI MATCH NHẦM"""
+    msg = message.lower().strip()
+    
+    # FIX: Xử lý câu hỏi về GIÁ CỤ THỂ trước tiên (ưu tiên cao nhất)
+    # Để tránh bị match nhầm với "chào" trong "bao nhiêu"
+    
+    # 1. KIỂM TRA CÂU HỎI VỀ GIÁ CỤ THỂ THEO ĐỊA ĐIỂM
+    if any(word in msg for word in ["giá", "price", "bao nhiêu", "bao nhiêu tiền", "chi phí"]):
+        # Kiểm tra xem có đề cập đến thành phố không
+        city_info = ""
+        if "hà nội" in msg or "hanoi" in msg:
+            city_info = "Hà Nội"
+            if "đơn" in msg:
+                response = f"🛏️ **Phòng Đơn tại InterContinental {city_info}:** 1.8 triệu VND/đêm\n📍 1 Lê Thánh Tông, Hoàn Kiếm\n📞 Hotline: 1800-9999"
+            elif "đôi" in msg:
+                response = f"🛏️ **Phòng Đôi tại InterContinental {city_info}:** 3 triệu VND/đêm\n📍 1 Lê Thánh Tông, Hoàn Kiếm\n📞 Hotline: 1800-9999"
+            elif "vip" in msg:
+                response = f"🛏️ **Phòng VIP tại InterContinental {city_info}:** 6 triệu VND/đêm\n📍 1 Lê Thánh Tông, Hoàn Kiếm\n📞 Hotline: 1800-9999"
+            else:
+                response = f"💰 **Giá phòng tại InterContinental {city_info}:**\n• Đơn: 1.8tr/đêm\n• Đôi: 3tr/đêm\n• VIP: 6tr/đêm\n📍 1 Lê Thánh Tông, Hoàn Kiếm\n📞 Hotline: 1800-9999"
+            
+            # Lưu vào history
+            _add_to_history(user_id, "user", message)
+            _add_to_history(user_id, "assistant", response)
+            return response
+        
+        # Tương tự cho các thành phố khác...
+        # (Có thể thêm các thành phố khác ở đây)
+    
+    # 2. Quick responses CHÍNH XÁC (không bị match nhầm)
+    # FIX: Kiểm tra chính xác hơn, tránh match "chào" trong "bao nhiêu"
+    
+    # Hotline - chỉ khi có từ khóa rõ ràng
+    hotline_keywords = ["hotline", "số điện thoại", "liên hệ", "điện thoại", "gọi điện", "gọi cho"]
+    if any(keyword in msg for keyword in hotline_keywords):
+        response = "📞 Hotline đặt phòng 24/7: 1800-9999"
+        _add_to_history(user_id, "user", message)
+        _add_to_history(user_id, "assistant", response)
+        return response
+    
+    # Cảm ơn - chỉ khi có từ khóa rõ ràng
     if any(w in msg for w in ["cảm ơn", "thanks", "thank you"]):
-        return "Cảm ơn bạn! Chúc bạn một ngày tốt lành! 😊"
+        response = "Cảm ơn bạn! Chúc bạn một ngày tốt lành! 😊"
+        _add_to_history(user_id, "user", message)
+        _add_to_history(user_id, "assistant", response)
+        return response
     
-    if any(w in msg for w in ["xin chào", "hello", "hi", "chào"]):
-        return "Xin chào! Tôi là trợ lý ảo MelMaybe. Tôi có thể giúp gì cho bạn?"
+    # Câu chào - CHỈ khi câu rất ngắn và bắt đầu bằng từ chào
+    # FIX QUAN TRỌNG: Tránh match "chào" trong "bao nhiêu"
+    if len(msg.split()) <= 3:  # Câu ngắn (tối đa 3 từ)
+        exact_greetings = ["xin chào", "hello", "hi ", "chào bạn", "chào anh", "chào chị", "chào em"]
+        for greeting in exact_greetings:
+            if msg.startswith(greeting) or msg == greeting.replace(" ", ""):
+                response = "Xin chào! Tôi là trợ lý ảo MelMaybe. Tôi có thể giúp gì cho bạn?"
+                _add_to_history(user_id, "user", message)
+                _add_to_history(user_id, "assistant", response)
+                return response
     
-    # Basic info from database (fallback khi AI không hoạt động)
-    if any(w in msg for w in ["khách sạn", "hotel", "chi nhánh", "ở đâu"]):
-        return "🏨 **Hệ thống InterContinental có 6 khách sạn 5 sao:**\n• Hà Nội : 1 Lê Thánh Tông\n• Đà Nẵng : Bãi biển Mỹ Khê\n• Nha Trang : 2 Trần Phú\n• Đà Lạt : Đồi Cù\n• TP.HCM : Bitexco Tower Q1\n• Thanh Hóa : Bãi biển Sầm Sơn"
+    # 3. Dùng AI CÓ MEMORY cho tất cả câu hỏi còn lại
+    response = _safe_groq_reply_with_context(message, user_id)
     
-    if any(w in msg for w in ["phòng đơn", "đơn"]):
-        return "🛏️ **Phòng Đơn:** 1.3 - 2 triệu VND/đêm (tùy địa điểm)"
+    # Lưu vào history
+    _add_to_history(user_id, "user", message)
+    _add_to_history(user_id, "assistant", response)
     
-    if any(w in msg for w in ["phòng đôi", "đôi"]):
-        return "🛏️ **Phòng Đôi:** 2.2 - 3.6 triệu VND/đêm"
-    
-    if any(w in msg for w in ["phòng vip", "vip"]):
-        return "🛏️ **Phòng VIP:** 4.5 - 7 triệu VND/đêm"
-    
-    if any(w in msg for w in ["giá", "price", "bao nhiêu"]):
-        return "💰 **Giá tham khảo:**\n• Đơn: 1.3-2tr\n• Đôi: 2.2-3.6tr\n• VIP: 4.5-7tr\n📞 Chi tiết: 1800-9999"
-    
-    # Dùng AI cho các câu hỏi phức tạp
-    return _safe_groq_reply(message)
+    return response
+
+# ========== HÀM CŨ VẪN ĐƯỢC GIỮ ĐỂ TƯƠNG THÍCH ==========
+def generate_reply(message: str) -> str:
+    """
+    Hàm cũ - VẪN HOẠT ĐỘNG để tương thích ngược
+    Nhưng bây giờ sẽ dùng memory với user mặc định
+    """
+    return generate_reply_with_memory(message, "default_user")
 
 def generate_groq_reply(user_message: str) -> str:
     """Wrapper function cho compatibility"""
@@ -148,3 +302,38 @@ Tôi có thể giúp bạn:
 • Hỗ trợ đặt phòng qua hotline 1800-9999
 
 Bạn muốn hỏi về điều gì cụ thể ạ?"""
+
+# ========== HÀM TIỆN ÍCH MỚI ==========
+def clear_chat_history(user_id: str = "default"):
+    """Xóa lịch sử chat của user"""
+    _clear_history(user_id)
+    print(f"🧹 Cleared chat history for user: {user_id}")
+
+def get_chat_history(user_id: str = "default") -> List[Dict]:
+    """Lấy lịch sử chat (cho debug)"""
+    return _get_user_history(user_id)
+
+# ========== TEST ==========
+if __name__ == "__main__":
+    # Test memory
+    print("🧪 Testing chatbot with memory...")
+    
+    test_cases = [
+        "Xin chào",
+        "Tôi muốn hỏi về khách sạn Hà Nội",
+        "Giá phòng đơn ở đó bao nhiêu?",  # Sẽ hiểu "ở đó" là Hà Nội
+        "Còn Đà Nẵng thì sao?",
+        "Cảm ơn!"
+    ]
+    
+    for i, question in enumerate(test_cases):
+        print(f"\n{'='*50}")
+        print(f"User [{i+1}]: {question}")
+        response = generate_reply_with_memory(question, "test_user")
+        print(f"Bot: {response}")
+    
+    print(f"\n{'='*50}")
+    print("📋 Chat history:")
+    history = get_chat_history("test_user")
+    for msg in history:
+        print(f"{msg['role'].upper()}: {msg['content'][:50]}...")
