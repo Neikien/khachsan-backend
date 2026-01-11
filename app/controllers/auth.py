@@ -3,6 +3,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, or_
 from botocore.client import BaseClient
+import re
+from email_validator import validate_email, EmailNotValidError
 from app.schemas.auth import SignupRequest, UserResponse, UserUpdate
 from app.core.config import config
 from app.core.dependencies import get_db, get_current_user, get_s3_client
@@ -21,12 +23,11 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
-    # QUAN TRỌNG: Sửa dòng này - tìm user bằng username HOẶC email
     result = await db.execute(
         select(User).where(
             or_(
-                User.username == form_data.username,  # Username cũ
-                User.email == form_data.username      # Email mới
+                User.username == form_data.username,
+                User.email == form_data.username
             )
         )
     )
@@ -50,12 +51,42 @@ async def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# Phần còn lại giữ nguyên...
 @router.post('/signup')
 async def signup(form_data: SignupRequest, db: AsyncSession = Depends(get_db)):
     logger.info(f"Signup attempt: {form_data.username}, {form_data.email}")
     
-    # Kiểm tra username tồn tại
+    errors = {}
+    
+    try:
+        validate_email(form_data.email)
+    except EmailNotValidError:
+        errors['email'] = "Email không hợp lệ"
+    
+    password = form_data.password
+    if len(password) < 6:
+        errors['password_length'] = "Mật khẩu phải có ít nhất 6 ký tự"
+    if not re.search(r'[A-Z]', password):
+        errors['password_upper'] = "Mật khẩu phải có ít nhất 1 chữ hoa"
+    if not re.search(r'[a-z]', password):
+        errors['password_lower'] = "Mật khẩu phải có ít nhất 1 chữ thường"
+    if not re.search(r'[0-9]', password):
+        errors['password_digit'] = "Mật khẩu phải có ít nhất 1 số"
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        errors['password_special'] = "Mật khẩu phải có ít nhất 1 ký tự đặc biệt"
+    
+    if form_data.fullname:
+        stripped = form_data.fullname.strip()
+        if stripped != form_data.fullname:
+            errors['fullname'] = "Tên không được có khoảng trắng ở đầu hoặc cuối"
+        if len(stripped.split()) < 2:
+            errors['fullname_format'] = "Vui lòng nhập đầy đủ họ và tên"
+    
+    if ' ' in form_data.username:
+        errors['username'] = "Username không được chứa khoảng trắng"
+    
+    if errors:
+        raise HTTPException(status_code=400, detail=errors)
+    
     result = await db.execute(
         select(User).where(User.username == form_data.username)
     )
@@ -65,7 +96,6 @@ async def signup(form_data: SignupRequest, db: AsyncSession = Depends(get_db)):
         logger.warning(f"Username already exists: {form_data.username}")
         raise HTTPException(status_code=400, detail="Username already exists")
 
-    # Kiểm tra email tồn tại
     result_email = await db.execute(
         select(User).where(User.email == form_data.email)
     )
@@ -75,10 +105,8 @@ async def signup(form_data: SignupRequest, db: AsyncSession = Depends(get_db)):
         logger.warning(f"Email already exists: {form_data.email}")
         raise HTTPException(status_code=400, detail="Email already exists")
 
-    # Hash password
     hashed_pwd = hash_password(form_data.password)
 
-    # Tạo user
     user = User(
         username=form_data.username,
         password=hashed_pwd,
@@ -93,14 +121,13 @@ async def signup(form_data: SignupRequest, db: AsyncSession = Depends(get_db)):
     logger.info(f"✅ Created user ID: {user.id}, username: {user.username}")
 
     try:
-        # Tạo KHACH_HANG với user_id
         customer = Customer(
             HoTen=form_data.fullname,
             Email=form_data.email,
             SoDienThoai="",
             CCCD="",
             DiaChi="",
-            user_id=user.id  # QUAN TRỌNG
+            user_id=user.id
         )
         
         db.add(customer)
@@ -182,10 +209,33 @@ async def update_user(
         errors['password'] = "Current password is incorrect"
 
     if request.email and request.email != cur_user.email:
+        try:
+            validate_email(request.email)
+        except EmailNotValidError:
+            errors['email'] = "Email không hợp lệ"
+        
         email_result = await db.execute(select(User).where(User.email == request.email))
         existing_email = email_result.scalar_one_or_none()
         if existing_email:
-            errors['email'] = "Email already exists"
+            errors['email_exists'] = "Email already exists"
+
+    if request.new_password:
+        password = request.new_password
+        if len(password) < 6:
+            errors['new_password_length'] = "Mật khẩu phải có ít nhất 6 ký tự"
+        if not re.search(r'[A-Z]', password):
+            errors['new_password_upper'] = "Mật khẩu phải có ít nhất 1 chữ hoa"
+        if not re.search(r'[a-z]', password):
+            errors['new_password_lower'] = "Mật khẩu phải có ít nhất 1 chữ thường"
+        if not re.search(r'[0-9]', password):
+            errors['new_password_digit'] = "Mật khẩu phải có ít nhất 1 số"
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+            errors['new_password_special'] = "Mật khẩu phải có ít nhất 1 ký tự đặc biệt"
+
+    if request.fullname:
+        stripped = request.fullname.strip()
+        if stripped != request.fullname:
+            errors['fullname'] = "Tên không được có khoảng trắng ở đầu hoặc cuối"
 
     if errors:
         raise HTTPException(status_code=400, detail=errors)
