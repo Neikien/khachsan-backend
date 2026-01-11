@@ -83,7 +83,7 @@ def _safe_groq_reply(user_message: str) -> str:
 4. Nhắc hotline 3636-2929 để đặt phòng/dịch vụ
 5. Trả lời bằng tiếng Việt, ngắn gọn, thân thiện
 6. Với dịch vụ: nêu giá và thời gian phục vụ
-7. Với liên hệ: cung cấp số quản lý tương ứng
+7. Với liên hệ: cung cấp số quản lý tương ứng, nhắc đến quản lý là phải đi kèm với số điện thoại
 8. Không nhắc đến giá và mã khách sạn trừ khi khách hỏi
 9. Khi nhận được câu hỏi, hãy xem thật kĩ xem thông tin có thể liên quan đến khu vực được hỏi hay không, xem xét kĩ r mới nhận định thông tin có liên quan đến mong muốn du lịch không"""
 
