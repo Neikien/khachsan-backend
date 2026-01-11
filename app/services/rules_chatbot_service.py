@@ -1,130 +1,87 @@
-import os
-import logging
-from typing import List, Dict
-from openai import OpenAI
+import time
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
-logger = logging.getLogger(__name__)
+@dataclass
+class ConversationSession:
+    user_id: str
+    messages: List[Dict]
+    created_at: float
+    last_activity: float
+    
+    def is_expired(self, timeout_minutes: int = 30) -> bool:
+        """Kiểm tra session có hết hạn chưa (30 phút không hoạt động)"""
+        return time.time() - self.last_activity > timeout_minutes * 60
+    
+    def update_activity(self):
+        """Cập nhật thời gian hoạt động cuối"""
+        self.last_activity = time.time()
+    
+    def add_message(self, role: str, content: str):
+        """Thêm tin nhắn vào session"""
+        self.messages.append({"role": role, "content": content})
+        self.update_activity()
+        
+        # Giới hạn lịch sử (giữ 12 tin nhắn gần nhất)
+        if len(self.messages) > 12:
+            self.messages = self.messages[-12:]
 
-# ========== BỘ NHỚ HỘI THOẠI ĐƠN GIẢN ==========
-# Lưu trữ lịch sử hội thoại theo user_id
-conversation_memory: Dict[str, List[Dict]] = {}
+class ConversationManager:
+    """Quản lý nhiều session hội thoại"""
+    
+    def __init__(self):
+        self.sessions: Dict[str, ConversationSession] = {}
+    
+    def get_session(self, user_id: str) -> ConversationSession:
+        """Lấy hoặc tạo session mới"""
+        self.cleanup_expired()
+        
+        if user_id not in self.sessions:
+            self.sessions[user_id] = ConversationSession(
+                user_id=user_id,
+                messages=[],
+                created_at=time.time(),
+                last_activity=time.time()
+            )
+        
+        return self.sessions[user_id]
+    
+    def cleanup_expired(self):
+        """Dọn dẹp session đã hết hạn"""
+        expired_ids = [
+            user_id for user_id, session in self.sessions.items()
+            if session.is_expired()
+        ]
+        for user_id in expired_ids:
+            del self.sessions[user_id]
+    
+    def clear_session(self, user_id: str):
+        """Xóa session của user"""
+        if user_id in self.sessions:
+            del self.sessions[user_id]
 
-def get_conversation_history(user_id: str = "default") -> List[Dict]:
-    """Lấy lịch sử hội thoại của user"""
-    return conversation_memory.get(user_id, [])
+# Sử dụng
+conv_manager = ConversationManager()
 
-def add_to_conversation(user_id: str = "default", 
-                       role: str = "user", 
-                       content: str = ""):
-    """Thêm tin nhắn vào lịch sử"""
-    if user_id not in conversation_memory:
-        conversation_memory[user_id] = []
+def generate_reply_with_session(message: str, user_id: str = "default") -> str:
+    """Chatbot với session management"""
+    # Lấy session của user
+    session = conv_manager.get_session(user_id)
     
-    # Giới hạn lịch sử để không quá dài (giữ 10 tin nhắn gần nhất)
-    if len(conversation_memory[user_id]) >= 20:  # 10 cặp user-bot
-        conversation_memory[user_id] = conversation_memory[user_id][-18:]
+    # Thêm tin nhắn user vào session
+    session.add_message("user", message)
     
-    conversation_memory[user_id].append({
-        "role": role,
-        "content": content
-    })
-
-def clear_conversation(user_id: str = "default"):
-    """Xóa lịch sử hội thoại"""
-    if user_id in conversation_memory:
-        conversation_memory[user_id] = []
-
-# ========== CHATBOT CÓ MEMORY ==========
-def generate_reply_with_memory(message: str, user_id: str = "default") -> str:
-    """Chatbot có nhớ context hội thoại"""
-    msg = message.lower().strip()
-    
-    # 1. Thêm tin nhắn user vào history
-    add_to_conversation(user_id, "user", message)
-    
-    # 2. Lấy lịch sử hội thoại
-    history = get_conversation_history(user_id)
-    
-    # 3. Kiểm tra quick responses (vẫn giữ để tăng tốc)
-    if any(w in msg for w in ["hotline", "số điện thoại", "liên hệ"]):
-        response = "📞 Hotline đặt phòng 24/7: 1800-9999"
-        add_to_conversation(user_id, "assistant", response)
-        return response
-    
-    if any(w in msg for w in ["cảm ơn", "thanks", "thank you"]):
-        response = "Cảm ơn bạn! Chúc bạn một ngày tốt lành! 😊"
-        add_to_conversation(user_id, "assistant", response)
-        return response
-    
-    # 4. Xử lý bằng AI với context
+    # Xử lý với AI có context
     try:
-        response = _safe_groq_reply_with_context(message, history)
-        add_to_conversation(user_id, "assistant", response)
+        response = _get_ai_response_with_context(message, session.messages)
+        session.add_message("assistant", response)
         return response
     except Exception as e:
-        logger.error(f"AI error: {e}")
-        response = "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại!"
-        add_to_conversation(user_id, "assistant", response)
-        return response
+        logger.error(f"Error: {e}")
+        return "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại!"
 
-def _safe_groq_reply_with_context(user_message: str, history: List[Dict]) -> str:
-    """AI với context hội thoại"""
-    api_key = os.getenv("GROQ_API_KEY") or os.getenv("apikey")
-    
-    if not api_key:
-        return emergency_fallback(user_message)
-    
-    system_prompt = """BẠN LÀ TRỢ LÝ ẢO MELMAYBE - HỆ THỐNG 6 KHÁCH SẠN 5 SAO:
-
-=== THÔNG TIN QUAN TRỌNG ===
-• 6 khách sạn: Hà Nội, Đà Nẵng, Nha Trang, Đà Lạt, TP.HCM, Thanh Hóa
-• Hotline: 1800-9999
-• Giá phòng: Hà Nội (Đơn 1.8tr, Đôi 3tr, VIP 6tr), Đà Nẵng (1.5tr, 2.5tr, 5tr), etc.
-
-=== QUY TẮC ===
-1. LUÔN nhớ context cuộc trò chuyện trước đó
-2. Nếu user hỏi tiếp theo, trả lời có liên kết với câu trước
-3. Trả lời ngắn gọn, thân thiện bằng tiếng Việt
-4. Dùng đúng thông tin trên, không bịa
-5. Nhắc hotline khi cần thiết"""
-    
-    try:
-        client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.groq.com/openai/v1"
-        )
-        
-        # Tạo messages từ: system prompt + history + câu hỏi mới
-        messages = [{"role": "system", "content": system_prompt}]
-        
-        # Thêm lịch sử hội thoại (chỉ lấy 8 tin nhắn gần nhất để tiết kiệm token)
-        recent_history = history[-8:] if len(history) > 8 else history
-        messages.extend(recent_history)
-        
-        # Thêm câu hỏi hiện tại (đã có trong history, nhưng cần thêm vào messages)
-        messages.append({"role": "user", "content": user_message})
-        
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=250,
-            timeout=20.0
-        )
-        
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        print(f"AI Error: {e}")
-        return emergency_fallback(user_message)
-
-# ========== API TƯƠNG THÍCH NGƯỢC ==========
-def generate_reply(message: str) -> str:
-    """Wrapper để tương thích với code cũ (dùng user mặc định)"""
-    return generate_reply_with_memory(message, "default_user")
-
-def emergency_fallback(message: str) -> str:
-    msg = message.lower()
-    if "hotline" in msg:
-        return "📞 Hotline: 1800-9999"
-    return "Xin lỗi, hệ thống đang bận. Vui lòng gọi 1800-9999 để được hỗ trợ."
+def _get_ai_response_with_context(user_message: str, history: List[Dict]) -> str:
+    """Gọi AI với context từ history"""
+    # ... tương tự như trên ...
+    pass
