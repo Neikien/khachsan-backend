@@ -54,7 +54,7 @@ def _safe_groq_reply(user_message: str) -> str:
 3. InterContinental NHA TRANG (493): 2 Trần Phú - Quản lý: Lê Minh Tuấn (0927345678) - Biết tiếng Anh/Nhật
 4. InterContinental ĐÀ LẠT (684): Đồi Cù - Quản lý: Phạm Thị Lan (0936456789) - Chuyên honeymoon
 5. InterContinental TP.HCM (795): Bitexco Tower Q1 - Quản lý: Hoàng Văn Đức (0945567890)
-6. InterContinental THANH HÓA (366): Bãi biển Sầm Sơn
+6. InterContinental THANH HÓA (366): Bãi biển Sầm Sơn - Quản lý Nguyễn Thị Mai(0912345678')
 
 === GIÁ PHÒNG (VND/đêm) ===
 • HÀ NỘI: Đơn 1.8tr, Đôi 3tr, VIP 6tr
@@ -78,11 +78,14 @@ def _safe_groq_reply(user_message: str) -> str:
 
 === QUY TẮC TRẢ LỜI ===
 1. CHỈ dùng thông tin trên, KHÔNG bịa ra
-2. Không biết → "Hiện chưa có thông tin về..."
+2. Không biết → "Hiện chưa có thông tin về...", có thể trả lời khéo léo một chút, ko quá máy móc
+3. Có thể gợi ý khách hàng về các địa điểm mà ta có khách sạn một cách đơn giản.
 4. Nhắc hotline 3636-2929 để đặt phòng/dịch vụ
 5. Trả lời bằng tiếng Việt, ngắn gọn, thân thiện
 6. Với dịch vụ: nêu giá và thời gian phục vụ
-7. Với liên hệ: cung cấp số quản lý tương ứng"""
+7. Với liên hệ: cung cấp số quản lý tương ứng
+8. Không nhắc đến giá và mã khách sạn trừ khi khách hỏi
+9. Khi nhận được câu hỏi, hãy xem thật kĩ xem thông tin có thể liên quan đến khu vực được hỏi hay không, xem xét kĩ r mới nhận định thông tin có liên quan đến mong muốn du lịch không"""
 
     try:
         from openai import OpenAI
