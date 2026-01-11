@@ -3,6 +3,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def _safe_groq_reply(user_message: str) -> str:
+    print("\n" + "="*60)
+    print("🚀 GROQ AI WITH FULL DATABASE KNOWLEDGE")
+    
+    api_key = os.getenv("apikey") or os.getenv("GROQ_API_KEY")
+    
+    if not api_key:
+        print("❌ No API key, using fallback")
+        return fallback_reply()
 def generate_reply(message: str) -> str:
     msg = message.lower()
 
@@ -35,15 +44,7 @@ def generate_reply(message: str) -> str:
     # Dùng AI cho các câu hỏi phức tạp
     return _safe_groq_reply(message)
 
-def _safe_groq_reply(user_message: str) -> str:
-    print("\n" + "="*60)
-    print("🚀 GROQ AI WITH FULL DATABASE KNOWLEDGE")
-    
-    api_key = os.getenv("apikey") or os.getenv("GROQ_API_KEY")
-    
-    if not api_key:
-        print("❌ No API key, using fallback")
-        return fallback_reply()
+
     
     # OPTIMIZED SYSTEM PROMPT với toàn bộ database
     system_prompt = """BẠN LÀ TRỢ LÝ ẢO MELMAYBE - HỆ THỐNG 6 KHÁCH SẠN 5 SAO:
