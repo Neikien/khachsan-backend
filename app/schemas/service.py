@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_serializer
 from typing import Optional
 from decimal import Decimal
 
@@ -18,5 +18,14 @@ class ServiceResponse(BaseModel):
     GiaDV: Decimal
     MoTa: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
+            Decimal: lambda v: float(v) if v is not None else None
+        }
+    )
+    
+    @field_serializer('GiaDV')
+    def serialize_gia_dv(self, gia_dv: Decimal, _info):
+        """Convert Decimal to float for JSON response"""
+        return float(gia_dv) if gia_dv else None
